@@ -1,0 +1,242 @@
+{
+  "project_title": "GeoPulse Studio - Precision Data Cartography Platform",
+  "app_type": "hybrid_fullstack",
+  "context_type": "DASHBOARDS & ANALYTICS / GEOSPATIAL MAP OVERLAY",
+  "archetype": "THE PERFORMANCE PRO / TACTICAL CARTOGRAPHY",
+  "theme_strategy": "Dark Cartographic Core (#0B0F17 base) with High-Contrast Tactical Signal Colors and sleek glass-morphism side panels. Supports crisp Light Mode toggle for high-sunlight outdoor field analysis.",
+  
+  "typography": {
+    "font_family_heading": "Outfit, Cabinet Grotesk, sans-serif",
+    "font_family_body": "Manrope, system-ui, sans-serif",
+    "font_family_mono": "IBM Plex Mono, JetBrains Mono, monospace",
+    "font_weights": {
+      "light": 300,
+      "regular": 400,
+      "medium": 500,
+      "semibold": 600,
+      "bold": 700,
+      "black": 900
+    },
+    "forbidden_fonts": ["Inter", "Roboto", "Open Sans", "Space Grotesk"],
+    "hierarchy": {
+      "h1": "text-3xl sm:text-4xl lg:text-5xl font-extrabold tracking-tight font-heading",
+      "h2": "text-xl sm:text-2xl lg:text-3xl font-bold tracking-tight font-heading",
+      "h3": "text-lg sm:text-xl font-semibold font-heading",
+      "h4": "text-base sm:text-lg font-medium font-heading",
+      "body": "text-sm sm:text-base font-normal font-body leading-relaxed",
+      "caption": "text-xs font-medium font-mono tracking-wider uppercase text-muted-foreground",
+      "metric_value": "text-2xl sm:text-3xl font-black font-mono tracking-tight"
+    }
+  },
+
+  "colors": {
+    "forbidden_colors": ["#7351B7", "#1B93A4", "generic purple-on-white gradients"],
+    "background_dark": "#0B0F17",
+    "surface_dark": "#111827",
+    "card_dark": "#1E293B",
+    "border_dark": "rgba(255, 255, 255, 0.12)",
+    "text_primary_dark": "#F9FAFB",
+    "text_secondary_dark": "#9CA3AF",
+    
+    "background_light": "#F8FAFC",
+    "surface_light": "#FFFFFF",
+    "card_light": "#F1F5F9",
+    "border_light": "rgba(15, 23, 42, 0.12)",
+    "text_primary_light": "#0F172A",
+    "text_secondary_light": "#475569",
+
+    "brand_primary": "#38BDF8",
+    "brand_accent": "#F59E0B",
+
+    "poi_layer_colors": {
+      "parks": {
+        "hex": "#10B981",
+        "label": "Parks & Open Spaces",
+        "badge_bg": "rgba(16, 185, 129, 0.15)",
+        "border": "#10B981"
+      },
+      "schools": {
+        "hex": "#38BDF8",
+        "label": "Schools & Universities",
+        "badge_bg": "rgba(56, 189, 248, 0.15)",
+        "border": "#38BDF8"
+      },
+      "daycares": {
+        "hex": "#F59E0B",
+        "label": "Daycares & Early Learning",
+        "badge_bg": "rgba(245, 158, 11, 0.15)",
+        "border": "#F59E0B"
+      },
+      "gas_stations": {
+        "hex": "#EF4444",
+        "label": "Gas Stations & EV Chargers",
+        "badge_bg": "rgba(239, 68, 68, 0.15)",
+        "border": "#EF4444"
+      },
+      "weather": {
+        "hex": "#8B5CF6",
+        "label": "Radar & Weather Anomalies",
+        "badge_bg": "rgba(139, 92, 246, 0.15)",
+        "border": "#8B5CF6"
+      },
+      "air_quality": {
+        "hex": "#06B6D4",
+        "label": "Air Quality Index (AQI)",
+        "badge_bg": "rgba(6, 182, 212, 0.15)",
+        "border": "#06B6D4"
+      },
+      "population": {
+        "hex": "#EC4899",
+        "label": "Population Density Heatmap",
+        "badge_bg": "rgba(236, 72, 153, 0.15)",
+        "border": "#EC4899"
+      },
+      "elevation": {
+        "hex": "#84CC16",
+        "label": "Elevation & Topography",
+        "badge_bg": "rgba(132, 204, 22, 0.15)",
+        "border": "#84CC16"
+      },
+      "traffic": {
+        "hex": "#F97316",
+        "label": "Traffic Congestion Live",
+        "badge_bg": "rgba(249, 115, 22, 0.15)",
+        "border": "#F97316"
+      }
+    }
+  },
+
+  "visual_enhancers": {
+    "glassmorphism": "backdrop-blur-xl bg-slate-900/80 border border-white/10 shadow-2xl shadow-black/40",
+    "light_glassmorphism": "backdrop-blur-xl bg-white/85 border border-slate-200/80 shadow-xl shadow-slate-900/10",
+    "tactile_card": "bg-slate-900/90 border border-slate-800 hover:border-slate-700 transition-all rounded-xl",
+    "tracing_beam": "relative before:absolute before:inset-0 before:p-[1px] before:bg-gradient-to-r before:from-sky-500/40 before:via-amber-500/40 before:to-emerald-500/40 before:-z-10 rounded-xl overflow-hidden",
+    "map_container": "relative w-full h-full rounded-2xl overflow-hidden border border-slate-800 shadow-2xl",
+    "pin_pulse": "animate-ping absolute inline-flex h-full w-full rounded-full bg-sky-400 opacity-75"
+  },
+
+  "layout_and_architecture": {
+    "structure": "Full-screen spatial workstation layout with sticky glass top nav, collapsible left layer panel, floating right proximity & feature analysis drawer, floating map controls toolbar, bottom legend bar, and dynamic modal overlays.",
+    "sidebar_width": "w-80 sm:w-96 shrink-0",
+    "map_flex": "flex-1 relative h-[calc(100vh-4rem)]",
+    "z_index_hierarchy": {
+      "base_map": "z-0",
+      "map_controls": "z-10",
+      "legend_bar": "z-20",
+      "floating_panels": "z-30",
+      "header_nav": "z-40",
+      "modals_and_popovers": "z-50"
+    }
+  },
+
+  "key_screens_and_components": {
+    "1_main_map_workstation": {
+      "description": "Interactive Leaflet/OpenStreetMap viewport with custom dark tile layer (CartoDB Dark Matter / Mapbox Dark equivalent) and smoothly responsive vector layers.",
+      "features": [
+        "Leaflet map rendering engine",
+        "Smooth pan/zoom control with keyboard shortcuts",
+        "Dynamic basemap switcher (Dark Matter, Satellite, Street Topo, Minimal Monochromatic)",
+        "Coordinate and scale display bar in bottom-right corner",
+        "Click-to-inspect feature functionality"
+      ]
+    },
+    "2_layer_control_sidebar": {
+      "description": "Collapsible control sidebar for switching overlays, adjusting individual opacities, toggling layer visibility, re-ordering layers, and filtering categories.",
+      "features": [
+        "Grouped categories: Built-in POIs (Schools, Daycares, Parks, Gas Stations), Environmental (Weather, AQI, Elevation), Urban Data (Traffic, Population)",
+        "Per-layer visibility toggle checkbox/switch with real-time map sync",
+        "Granular opacity slider (0% to 100%) with percentage readout",
+        "Custom upload section trigger button",
+        "Quick 'Select All' / 'Hide All' master buttons",
+        "Count badges showing total rendered nodes per layer"
+      ]
+    },
+    "3_property_proximity_analysis_panel": {
+      "description": "Dedicated spatial intelligence panel to search an address, drop a pin on any property line, adjust buffer radius slider, and analyze nearby amenities.",
+      "features": [
+        "Address/Coordinates search input with instant geocoding autocomplete",
+        "Interactive 'Drop Pin on Map' tool button",
+        "Radius slider (100 meters to 10,000 meters / 0.1 miles to 5 miles) with step controls",
+        "Visual buffer circle rendered on Leaflet map with pulsing center pin",
+        "Real-time summary dashboard: Total POIs in radius, nearest POI category breakdown, risk/convenience metric score",
+        "Expandable list of POIs inside buffer sorted by distance (with 'Focus on Map' action)"
+      ]
+    },
+    "4_feature_details_popover": {
+      "description": "Rich floating details popover when clicking any POI, custom GeoJSON point/polygon, or environmental grid cell.",
+      "features": [
+        "Entity title and classification badge",
+        "Exact distance from selected property pin",
+        "Key spatial attributes table (Lat/Long, Elevation, Address, Contact, Operating status)",
+        "Environmental stats (AQI index meter, Temperature, Traffic speed if applicable)",
+        "Action buttons: 'Set as Analysis Center', 'Copy Coordinates', 'Directions'"
+      ]
+    },
+    "5_custom_geojson_csv_upload_modal": {
+      "description": "User upload flow allowing drag-and-drop of custom GeoJSON or CSV files to render user data as a live overlay layer.",
+      "features": [
+        "Drag & drop file upload zone for .geojson, .json, .csv files",
+        "Automatic column mapping preview for CSV (Latitude, Longitude, Title, Category)",
+        "Custom layer styling options: marker icon, stroke color, fill color, label field selector",
+        "Save & render custom layer into the master layer control panel"
+      ]
+    },
+    "6_interactive_legend_and_toolbar": {
+      "description": "Bottom-left dynamic map legend reflecting active layers and top-right map manipulation toolbar.",
+      "features": [
+        "Legend entries auto-generated based on currently visible layers",
+        "Color swatch indicators matching actual map symbols",
+        "Quick toolbar for Zoom In/Out, Measure Distance tool, Clear Pins, and Fullscreen toggle"
+      ]
+    }
+  },
+
+  "motion_and_interactions": {
+    "library": "framer-motion for React components, Leaflet native CSS transitions for map features",
+    "rules": [
+      "Use specific CSS properties for transitions (e.g., transition: opacity 0.2s ease, transform 0.2s ease), NEVER transition: all",
+      "Respect prefers-reduced-motion media query",
+      "Sidebar collapse/expand uses smooth spring physics (stiffness: 300, damping: 30)",
+      "Layer opacity slider provides immediate real-time canvas updates with zero jitter",
+      "Pin drop triggers a gentle drop animation followed by an ambient ripple effect"
+    ]
+  },
+
+  "accessibility_and_testing": {
+    "contrast": "All text elements meet WCAG AA standards (minimum 4.5:1 ratio). Mono spatial labels use high-visibility white/light-gray against dark slate surfaces.",
+    "hover_contrast_rule": "Hover states must explicitly declare text colors (e.g. hover:bg-slate-800 hover:text-sky-400). Never rely on default text inheritance.",
+    "data_testid_policy": "MANDATORY: Every button, toggle, slider, input, map feature card, and metric container MUST include explicit `data-testid` in kebab-case format.",
+    "data_testid_examples": [
+      "data-testid=\"app-header-logo\"",
+      "data-testid=\"theme-toggle-button\"",
+      "data-testid=\"search-address-input\"",
+      "data-testid=\"drop-pin-button\"",
+      "data-testid=\"radius-slider\"",
+      "data-testid=\"layer-toggle-parks\"",
+      "data-testid=\"layer-opacity-slider-parks\"",
+      "data-testid=\"custom-upload-button\"",
+      "data-testid=\"proximity-summary-card\"",
+      "data-testid=\"poi-distance-item-0\"",
+      "data-testid=\"feature-popover-close-button\""
+    ]
+  },
+
+  "instructions_to_main_agent": [
+    "Follow the exact component guidelines and architectural breakdown above.",
+    "Use Leaflet + OpenStreetMap dark matter tiles or CartoDB dark tiles as default basemap for dark theme.",
+    "Do NOT use generic blue/purple default gradients. Use deep slate dark mode with tactical signal colors (Amber #F59E0B, Cyan #38BDF8, Emerald #10B981, Crimson #EF4444).",
+    "Ensure all sliders (layer opacity, buffer radius) are fully interactive and update the map state smoothly.",
+    "Implement full mock datasets for POIs (Parks, Daycares, Schools, Gas Stations) and environmental layers so the map feels pre-populated and rich upon load.",
+    "Provide sample GeoJSON download or sample dataset button inside the Custom Upload modal so users can test custom file overlay easily.",
+    "Ensure all interactive elements have data-testid attributes.",
+    "Never hide essential map navigation controls."
+  ],
+
+  "UNIVERSAL GUIDELINES FOR MAIN AGENT": [
+    "Avoid AI slop aesthetics. Use dark slate backgrounds (#0B0F17) with crisp borders and clean typography.",
+    "Do not center-align everything. Use structured grids and left-aligned tactical content.",
+    "Layer glass-morphism panels over the Leaflet map with backdrop-blur-xl and 1px border highlights.",
+    "Include hover and focus transitions on every button, tab, and card.",
+    "Ensure full reactivity when toggling layers or adjusting radius sliders."
+  ]
+}

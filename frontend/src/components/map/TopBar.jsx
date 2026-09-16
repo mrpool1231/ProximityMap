@@ -1,0 +1,75 @@
+import { Button } from "@/components/ui/button";
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger, DropdownMenuLabel, DropdownMenuSeparator } from "@/components/ui/dropdown-menu";
+import { BASEMAPS } from "@/lib/mapConfig";
+import { Compass, Layers2, Github } from "lucide-react";
+
+export default function TopBar({ basemap, setBasemap, pin }) {
+  return (
+    <header
+      className="relative z-40 flex h-14 items-center justify-between border-b border-white/5 bg-[#0b0f17]/95 px-4 backdrop-blur-xl"
+      data-testid="app-header"
+    >
+      <div className="flex items-center gap-3">
+        <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-gradient-to-br from-sky-400/25 to-amber-400/25 ring-1 ring-white/10">
+          <Compass size={18} className="text-sky-400" />
+        </div>
+        <div>
+          <div className="font-heading text-base font-bold tracking-tight" data-testid="app-title">
+            GeoPulse<span className="text-sky-400">.</span>Studio
+          </div>
+          <div className="text-[10px] font-mono uppercase tracking-widest text-slate-500">
+            Precision Data Cartography
+          </div>
+        </div>
+      </div>
+
+      <div className="flex items-center gap-2">
+        {pin && (
+          <div className="hidden items-center gap-2 rounded-lg border border-white/10 bg-slate-900/60 px-3 py-1.5 md:flex">
+            <span className="text-[10px] font-mono uppercase tracking-widest text-slate-500">Focus</span>
+            <span className="font-mono text-xs text-slate-200">
+              {pin[0].toFixed(4)}, {pin[1].toFixed(4)}
+            </span>
+          </div>
+        )}
+        <DropdownMenu>
+          <DropdownMenuTrigger asChild>
+            <Button
+              variant="outline"
+              size="sm"
+              className="h-9 border-white/10 bg-slate-900/60 text-slate-200 hover:border-sky-400/40 hover:bg-sky-400/5 hover:text-sky-300"
+              data-testid="basemap-selector"
+            >
+              <Layers2 size={13} className="mr-2" />
+              {BASEMAPS[basemap]?.label}
+            </Button>
+          </DropdownMenuTrigger>
+          <DropdownMenuContent align="end" className="border-white/10 bg-[#0b0f17] text-slate-100">
+            <DropdownMenuLabel className="text-[10px] font-mono uppercase tracking-widest text-slate-400">
+              Basemap
+            </DropdownMenuLabel>
+            <DropdownMenuSeparator className="bg-white/10" />
+            {Object.entries(BASEMAPS).map(([id, bm]) => (
+              <DropdownMenuItem
+                key={id}
+                onClick={() => setBasemap(id)}
+                className="cursor-pointer text-sm text-slate-200 hover:bg-slate-800 focus:bg-slate-800 focus:text-sky-300"
+                data-testid={`basemap-option-${id}`}
+              >
+                {bm.label}
+              </DropdownMenuItem>
+            ))}
+          </DropdownMenuContent>
+        </DropdownMenu>
+        <a
+          href="https://www.openstreetmap.org/copyright"
+          target="_blank"
+          rel="noreferrer"
+          className="hidden text-slate-500 hover:text-slate-300 md:block"
+        >
+          <Github size={14} />
+        </a>
+      </div>
+    </header>
+  );
+}
