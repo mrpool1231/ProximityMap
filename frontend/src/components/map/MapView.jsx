@@ -1,7 +1,8 @@
-import { MapContainer, TileLayer, Marker, Circle, GeoJSON, useMap, useMapEvents } from "react-leaflet";
+import { MapContainer, TileLayer, Marker, Circle, Polygon, Polyline, CircleMarker, GeoJSON, useMap, useMapEvents } from "react-leaflet";
 import { useEffect, useMemo, useRef } from "react";
 import L from "leaflet";
 import { BASEMAPS, LAYER_BY_ID } from "@/lib/mapConfig";
+import { propertyBuffer } from "@/lib/geo";
 import { renderToStaticMarkup } from "react-dom/server";
 import { MapPin } from "lucide-react";
 
@@ -28,6 +29,11 @@ function makePinIcon() {
 }
 
 function MapClickHandler({ onClick, enabled }) {
+  const map = useMap();
+  useEffect(() => {
+    if (enabled) map.doubleClickZoom.disable();
+    else map.doubleClickZoom.enable();
+  }, [enabled, map]);
   useMapEvents({
     click(e) {
       if (enabled) onClick([e.latlng.lat, e.latlng.lng]);
@@ -45,19 +51,37 @@ function Recenter({ center, zoom }) {
   return null;
 }
 
+const PROPERTY_STYLE = { color: "#F59E0B", weight: 2, fillColor: "#F59E0B", fillOpacity: 0.18 };
+const BUFFER_STYLE = { color: "#38BDF8", weight: 1.5, fillColor: "#38BDF8", fillOpacity: 0.08, dashArray: "4 6" };
+
+export function BufferOverlay({ pin, radius, property }) {
+  const buffer = useMemo(() => (property ? propertyBuffer(property, radius) : null), [property, radius]);
+  if (property) {
+    return (
+      <>
+        <GeoJSON key={`${radius}-${property.length}-${property[0]}`} data={buffer} style={BUFFER_STYLE} />
+        <Polygon positions={property} pathOptions={PROPERTY_STYLE} />
+      </>
+    );
+  }
+  return pin && radius > 0 ? <Circle center={pin} radius={radius} pathOptions={BUFFER_STYLE} /> : null;
+}
+
 export default function MapView({
   basemap = "dark",
-  center,
-  zoom,
+  view,
   pin,
   onMapClick,
   clickPinMode,
+  drawPoints,
+  property,
   radius,
   layerData, // { [layerId]: { features: [...] } }
   layerVisibility,
   layerOpacity,
   customLayers,
   onPoiClick,
+  trafficTileUrl,
 }) {
   const bm = BASEMAPS[basemap] || BASEMAPS.dark;
   const iconCache = useRef({});
@@ -69,37 +93,41 @@ export default function MapView({
   };
 
   const pinIcon = useMemo(() => makePinIcon(), []);
+  const drawing = Array.isArray(drawPoints);
 
   return (
     <MapContainer
-      center={center}
-      zoom={zoom}
+      center={view.center}
+      zoom={view.zoom}
       className="h-full w-full"
       zoomControl={true}
       preferCanvas={true}
       data-testid="map-container"
     >
       <TileLayer key={basemap} url={bm.url} attribution={bm.attribution} className={bm.className || ""} />
+      {trafficTileUrl && layerVisibility.traffic && (
+        <TileLayer
+          key="traffic"
+          url={trafficTileUrl}
+          opacity={(layerOpacity.traffic ?? 60) / 100}
+          zIndex={400}
+          maxZoom={22}
+          attribution='Traffic &copy; <a href="https://www.tomtom.com/">TomTom</a>'
+        />
+      )}
 
-      <Recenter center={pin || center} zoom={zoom} />
-      <MapClickHandler enabled={clickPinMode} onClick={onMapClick} />
+      <Recenter center={view.center} zoom={view.zoom} />
+      <MapClickHandler enabled={clickPinMode || drawing} onClick={onMapClick} />
 
-      {pin && (
+      {pin && <Marker position={pin} icon={pinIcon} />}
+      <BufferOverlay pin={pin} radius={radius} property={property} />
+
+      {drawing && drawPoints.length > 0 && (
         <>
-          <Marker position={pin} icon={pinIcon} />
-          {radius > 0 && (
-            <Circle
-              center={pin}
-              radius={radius}
-              pathOptions={{
-                color: "#38BDF8",
-                weight: 1.5,
-                fillColor: "#38BDF8",
-                fillOpacity: 0.08,
-                dashArray: "4 6",
-              }}
-            />
-          )}
+          <Polyline positions={drawPoints.length > 2 ? [...drawPoints, drawPoints[0]] : drawPoints} pathOptions={{ color: "#F59E0B", weight: 2, dashArray: "6 4" }} />
+          {drawPoints.map((p, i) => (
+            <CircleMarker key={i} center={p} radius={5} pathOptions={{ color: "#0b0f17", fillColor: "#F59E0B", fillOpacity: 1, weight: 1.5 }} />
+          ))}
         </>
       )}
 

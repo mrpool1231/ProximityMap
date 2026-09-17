@@ -97,6 +97,7 @@ code {
 .leaflet-container {
     background: #0b0f17;
     font-family: var(--font-body);
+    isolation: isolate;
 }
 
 /* Free "dark matter" style: invert + rotate hue on OSM tiles */
@@ -210,4 +211,42 @@ code {
     border: 2px solid #0b0f17;
     border-radius: 9999px;
     box-shadow: 0 0 20px rgba(56, 189, 248, 0.7);
+}
+
+/* Crosshair while dropping pins / drawing outlines */
+.map-capture-mode .leaflet-container {
+    cursor: crosshair;
+}
+
+/* Print-ready property brief */
+#print-report .leaflet-container {
+    background: #f1f5f9;
+}
+@media print {
+    @page {
+        size: A4;
+        margin: 10mm;
+    }
+    html,
+    body {
+        height: auto !important;
+        overflow: visible !important;
+        background: #fff !important;
+    }
+    #root {
+        display: none !important;
+    }
+    #print-report {
+        position: static !important;
+        inset: auto !important;
+        height: auto !important;
+        overflow: visible !important;
+        background: #fff !important;
+    }
+    .no-print {
+        display: none !important;
+    }
+    .print-map {
+        break-inside: avoid;
+    }
 }

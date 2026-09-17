@@ -6,7 +6,7 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { ChevronDown, ChevronRight, Upload, Trash2, Layers } from "lucide-react";
 
-function LayerRow({ layer, visible, opacity, count, onToggle, onOpacity }) {
+function LayerRow({ layer, visible, opacity, count, onToggle, onOpacity, warning }) {
   const Icon = layer.icon;
   return (
     <div className="group flex flex-col gap-2 rounded-lg border border-white/5 bg-slate-900/50 px-3 py-2.5 transition-colors hover:border-white/10">
@@ -50,6 +50,11 @@ function LayerRow({ layer, visible, opacity, count, onToggle, onOpacity }) {
           />
         </div>
       )}
+      {visible && warning && (
+        <div className="ml-9 rounded-md border border-amber-400/30 bg-amber-400/5 px-2 py-1 text-[10px] text-amber-200" data-testid={`layer-warning-${layer.id}`}>
+          {warning}
+        </div>
+      )}
     </div>
   );
 }
@@ -83,6 +88,7 @@ export default function LayerSidebar({
   onToggleCustom,
   onDeleteCustom,
   onCustomOpacity,
+  trafficEnabled,
 }) {
   return (
     <aside
@@ -153,6 +159,7 @@ export default function LayerSidebar({
               opacity={opacity[l.id] ?? 60}
               onToggle={(v) => onToggle(l.id, v)}
               onOpacity={(v) => onOpacityChange(l.id, v)}
+              warning={l.id === "traffic" && !trafficEnabled ? "Live traffic needs a TomTom key — set TOMTOM_API_KEY on the backend." : undefined}
             />
           ))}
         </Group>

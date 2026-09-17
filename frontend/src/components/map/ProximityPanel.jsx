@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState } from "react";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Slider } from "@/components/ui/slider";
@@ -6,8 +6,9 @@ import { Badge } from "@/components/ui/badge";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Separator } from "@/components/ui/separator";
 import { MapPin, Search, Crosshair, Loader2, Target, ChevronRight, CloudRain, Wind, Mountain } from "lucide-react";
-import { geocode, fetchWeather, fetchAirQuality, fetchElevation } from "@/lib/api";
+import { geocode } from "@/lib/api";
 import { LAYER_BY_ID } from "@/lib/mapConfig";
+import PropertyTools from "@/components/map/PropertyTools";
 import { toast } from "sonner";
 
 function fmtDist(m) {
@@ -39,31 +40,12 @@ export default function ProximityPanel({
   proximityData,
   loading,
   onFocusPoi,
+  env,
+  propertyTools,
 }) {
   const [q, setQ] = useState("");
   const [results, setResults] = useState([]);
   const [searching, setSearching] = useState(false);
-  const [env, setEnv] = useState({ weather: null, aqi: null, elev: null });
-
-  useEffect(() => {
-    if (!pin) return;
-    let alive = true;
-    (async () => {
-      try {
-        const [w, a, e] = await Promise.all([
-          fetchWeather(pin[0], pin[1]),
-          fetchAirQuality(pin[0], pin[1]),
-          fetchElevation(pin[0], pin[1]),
-        ]);
-        if (alive) setEnv({ weather: w, aqi: a, elev: e });
-      } catch {
-        // silent
-      }
-    })();
-    return () => {
-      alive = false;
-    };
-  }, [pin?.[0], pin?.[1]]);
 
   const runSearch = async () => {
     if (!q.trim()) return;
@@ -79,9 +61,9 @@ export default function ProximityPanel({
     }
   };
 
-  const currentWeather = env.weather?.current;
-  const currentAqi = env.aqi?.current;
-  const elevation = env.elev?.elevation?.[0];
+  const currentWeather = env?.weather?.current;
+  const currentAqi = env?.aqi?.current;
+  const elevation = env?.elev?.elevation?.[0];
 
   return (
     <aside
@@ -152,6 +134,8 @@ export default function ProximityPanel({
           <Crosshair size={14} className="mr-2" />
           {clickPinMode ? "Click map to drop pin…" : "Drop pin on map"}
         </Button>
+
+        <PropertyTools {...propertyTools} />
       </div>
 
       <div className="border-b border-white/5 px-4 py-4">
@@ -196,6 +180,9 @@ export default function ProximityPanel({
                 </div>
                 <div className="font-mono text-[11px] text-slate-300">
                   {pin[0].toFixed(5)}, {pin[1].toFixed(5)}
+                </div>
+                <div className="mt-1 text-[10px] text-slate-500" data-testid="distance-mode">
+                  {propertyTools?.property ? "Distances from property line" : "Distances from center point"}
                 </div>
               </div>
 

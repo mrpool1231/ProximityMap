@@ -1,4 +1,6 @@
-from fastapi import FastAPI, APIRouter, HTTPException, Query
+from fastapi import FastAPI, APIRouter, HTTPException, Query, Path as FPath
+from fastapi.responses import Response
+import secrets
 from dotenv import load_dotenv
 from starlette.middleware.cors import CORSMiddleware
 from motor.motor_asyncio import AsyncIOMotorClient
@@ -76,6 +78,16 @@ class CustomLayerCreate(BaseModel):
     color: Optional[str] = "#38BDF8"
     icon: Optional[str] = "MapPin"
     geojson: Dict[str, Any]
+
+class Report(BaseModel):
+    id: str = Field(default_factory=lambda: secrets.token_urlsafe(6))
+    state: Dict[str, Any]
+    created_at: str = Field(default_factory=lambda: datetime.now(timezone.utc).isoformat())
+
+class ReportCreate(BaseModel):
+    state: Dict[str, Any]
+
+TOMTOM_KEY = os.environ.get("TOMTOM_API_KEY", "").strip()
 
 # ---------- Routes ----------
 @api_router.get("/")
@@ -305,6 +317,46 @@ async def delete_custom_layer(layer_id: str):
     if res.deleted_count == 0:
         raise HTTPException(status_code=404, detail="layer not found")
     return {"deleted": layer_id}
+
+
+@api_router.post("/reports", response_model=Report)
+async def create_report(payload: ReportCreate):
+    obj = Report(state=payload.state)
+    await db.reports.insert_one(obj.model_dump())
+    return obj
+
+
+@api_router.get("/reports/{report_id}", response_model=Report)
+async def get_report(report_id: str):
+    row = await db.reports.find_one({"id": report_id}, {"_id": 0})
+    if not row:
+        raise HTTPException(status_code=404, detail="report not found")
+    return row
+
+
+@api_router.get("/traffic/config")
+async def traffic_config():
+    return {"enabled": bool(TOMTOM_KEY), "provider": "TomTom", "style": "relative"}
+
+
+@api_router.get("/traffic/tiles/{z}/{x}/{y}.png")
+async def traffic_tile(z: int = FPath(ge=0, le=22), x: int = FPath(ge=0), y: int = FPath(ge=0)):
+    limit = 1 << z
+    if x >= limit or y >= limit:
+        raise HTTPException(status_code=400, detail="invalid tile coordinates")
+    if not TOMTOM_KEY:
+        raise HTTPException(status_code=404, detail="traffic tiles are disabled")
+    url = f"https://api.tomtom.com/traffic/map/4/tile/flow/relative/{z}/{x}/{y}.png"
+    try:
+        async with httpx.AsyncClient(timeout=10.0) as cli:
+            up = await cli.get(url, params={"key": TOMTOM_KEY, "thickness": 4})
+    except httpx.RequestError:
+        raise HTTPException(status_code=502, detail="traffic provider unavailable")
+    if up.status_code == 404:
+        raise HTTPException(status_code=404, detail="traffic tile not available")
+    if up.status_code != 200:
+        raise HTTPException(status_code=502, detail="traffic provider error")
+    return Response(content=up.content, media_type="image/png", headers={"Cache-Control": "public, max-age=30"})
 
 
 app.include_router(api_router)

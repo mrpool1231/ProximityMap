@@ -36,7 +36,7 @@ export const ENV_LAYERS = [
 // Placeholder / conceptual overlays not backed by a live API
 export const CONCEPT_LAYERS = [
   { id: "population", label: "Population Density", color: "#EC4899", icon: Users, group: "Urban", note: "Heat blur visualisation" },
-  { id: "traffic", label: "Traffic Congestion", color: "#F97316", icon: Car, group: "Urban", note: "Mock congestion arcs" },
+  { id: "traffic", label: "Traffic Congestion", color: "#F97316", icon: Car, group: "Urban", note: "Live flow · TomTom" },
 ];
 
 export const LAYER_BY_ID = Object.fromEntries(

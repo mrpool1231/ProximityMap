@@ -5,8 +5,21 @@ import ProximityPanel from "@/components/map/ProximityPanel";
 import TopBar from "@/components/map/TopBar";
 import Legend from "@/components/map/Legend";
 import UploadModal from "@/components/map/UploadModal";
+import PrintReport from "@/components/map/PrintReport";
 import { DEFAULT_CENTER, DEFAULT_ZOOM, POI_LAYERS, ENV_LAYERS, CONCEPT_LAYERS } from "@/lib/mapConfig";
-import { fetchPOIs, listCustomLayers, deleteCustomLayer } from "@/lib/api";
+import {
+  fetchPOIs,
+  listCustomLayers,
+  deleteCustomLayer,
+  fetchTrafficConfig,
+  saveReport,
+  loadReport,
+  fetchWeather,
+  fetchAirQuality,
+  fetchElevation,
+  TRAFFIC_TILE_URL,
+} from "@/lib/api";
+import { propertyCentroid, propertyReach, applyPropertyDistances } from "@/lib/geo";
 import { toast } from "sonner";
 
 const ALL_LAYERS = [...POI_LAYERS, ...ENV_LAYERS, ...CONCEPT_LAYERS];
@@ -27,34 +40,70 @@ const initialOpacity = () => {
 
 export default function MapWorkstation() {
   const [basemap, setBasemap] = useState("dark");
-  const [center] = useState(DEFAULT_CENTER);
-  const [zoom, setZoom] = useState(DEFAULT_ZOOM);
+  const [view, setView] = useState({ center: DEFAULT_CENTER, zoom: DEFAULT_ZOOM });
   const [pin, setPin] = useState(null);
   const [radius, setRadius] = useState(1500);
   const [clickPinMode, setClickPinMode] = useState(false);
+  const [property, setProperty] = useState(null); // [[lat, lon], ...]
+  const [drawPoints, setDrawPoints] = useState(null); // null = not drawing
 
   const [visibility, setVisibility] = useState(initialVisibility);
   const [opacity, setOpacity] = useState(initialOpacity);
 
   const [proximityData, setProximityData] = useState(null);
   const [loadingPois, setLoadingPois] = useState(false);
+  const [env, setEnv] = useState(null);
 
   const [customLayers, setCustomLayers] = useState([]);
   const [uploadOpen, setUploadOpen] = useState(false);
+  const [reportOpen, setReportOpen] = useState(false);
+  const [trafficCfg, setTrafficCfg] = useState({ enabled: false });
+  const [sharing, setSharing] = useState(false);
 
   const activePoiLayers = useMemo(
     () => POI_LAYERS.filter((l) => visibility[l.id]).map((l) => l.id),
     [visibility]
   );
 
-  // Load custom layers once
+  const applyProperty = useCallback((latlngs, zoom = 16) => {
+    const c = propertyCentroid(latlngs);
+    setProperty(latlngs);
+    setPin(c);
+    setView({ center: c, zoom });
+  }, []);
+
+  const restoreReport = useCallback(
+    (s) => {
+      if (s.visible) setVisibility(Object.fromEntries(ALL_LAYERS.map((l) => [l.id, s.visible.includes(l.id)])));
+      if (s.opacity) setOpacity((prev) => ({ ...prev, ...s.opacity }));
+      if (s.basemap) setBasemap(s.basemap);
+      if (s.radius) setRadius(s.radius);
+      if (s.property?.length >= 3) applyProperty(s.property, s.zoom || 16);
+      else if (s.pin) {
+        setPin(s.pin);
+        setView({ center: s.pin, zoom: s.zoom || 15 });
+      }
+    },
+    [applyProperty]
+  );
+
   useEffect(() => {
     listCustomLayers()
       .then((rows) => setCustomLayers(rows.map((r) => ({ ...r, visible: true, opacity: 100 }))))
       .catch(() => {});
-  }, []);
+    fetchTrafficConfig().then(setTrafficCfg).catch(() => {});
+    const id = new URLSearchParams(window.location.search).get("report");
+    if (id) {
+      loadReport(id)
+        .then((r) => {
+          restoreReport(r.state);
+          toast.success("Shared report loaded");
+        })
+        .catch(() => toast.error("Shared report not found"));
+    }
+  }, [restoreReport]);
 
-  // Fetch POIs whenever pin / radius / visible POI categories change
+  // Fetch POIs whenever pin / radius / property / visible POI categories change
   useEffect(() => {
     if (!pin || activePoiLayers.length === 0) {
       setProximityData(null);
@@ -62,34 +111,100 @@ export default function MapWorkstation() {
     }
     let alive = true;
     setLoadingPois(true);
-    fetchPOIs({ lat: pin[0], lon: pin[1], radius, categories: activePoiLayers })
-      .then((d) => alive && setProximityData(d))
+    const reach = property ? propertyReach(property) : 0;
+    fetchPOIs({ lat: pin[0], lon: pin[1], radius: Math.round(radius + reach), categories: activePoiLayers })
+      .then((d) => alive && setProximityData(property ? applyPropertyDistances(d, property, radius) : d))
       .catch(() => alive && toast.error("POI fetch failed"))
       .finally(() => alive && setLoadingPois(false));
     return () => {
       alive = false;
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [pin?.[0], pin?.[1], radius, activePoiLayers.join(",")]);
+  }, [pin?.[0], pin?.[1], radius, activePoiLayers.join(","), property]);
 
-  const onToggle = useCallback((id, v) => {
-    setVisibility((prev) => ({ ...prev, [id]: v }));
-  }, []);
-  const onOpacityChange = useCallback((id, v) => {
-    setOpacity((prev) => ({ ...prev, [id]: v }));
-  }, []);
+  useEffect(() => {
+    if (!pin) return;
+    let alive = true;
+    Promise.all([fetchWeather(pin[0], pin[1]), fetchAirQuality(pin[0], pin[1]), fetchElevation(pin[0], pin[1])])
+      .then(([w, a, e]) => alive && setEnv({ weather: w, aqi: a, elev: e }))
+      .catch(() => {});
+    return () => {
+      alive = false;
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [pin?.[0], pin?.[1]]);
+
+  const onToggle = useCallback((id, v) => setVisibility((prev) => ({ ...prev, [id]: v })), []);
+  const onOpacityChange = useCallback((id, v) => setOpacity((prev) => ({ ...prev, [id]: v })), []);
   const selectAll = () => setVisibility(Object.fromEntries(ALL_LAYERS.map((l) => [l.id, true])));
   const hideAll = () => setVisibility(Object.fromEntries(ALL_LAYERS.map((l) => [l.id, false])));
 
-  const onMapClick = (coords) => {
+  const placePin = (coords, zoom) => {
+    setProperty(null);
     setPin(coords);
+    setView({ center: coords, zoom: zoom ?? view.zoom });
+  };
+  const onMapClick = (coords) => {
+    if (Array.isArray(drawPoints)) {
+      setDrawPoints([...drawPoints, coords]);
+      return;
+    }
+    placePin(coords);
     setClickPinMode(false);
     toast.success("Pin dropped", { description: `${coords[0].toFixed(4)}, ${coords[1].toFixed(4)}` });
   };
   const onSearchSelect = (coords, label) => {
-    setPin(coords);
-    setZoom(15);
+    placePin(coords, 15);
     toast.success("Location set", { description: label?.split(",").slice(0, 2).join(",") });
+  };
+
+  const propertyTools = {
+    property,
+    drawPoints,
+    onStartDraw: () => {
+      setClickPinMode(false);
+      setDrawPoints([]);
+    },
+    onCancelDraw: () => setDrawPoints(null),
+    onFinishDraw: () => {
+      if (drawPoints.length < 3) return;
+      applyProperty(drawPoints, view.zoom);
+      setDrawPoints(null);
+      toast.success("Property outline set", { description: `${drawPoints.length} corners` });
+    },
+    onOutline: (latlngs) => {
+      applyProperty(latlngs);
+      toast.success("Property outline loaded", { description: `${latlngs.length} vertices` });
+    },
+    onClear: () => setProperty(null),
+  };
+
+  const onShare = async () => {
+    setSharing(true);
+    try {
+      const state = {
+        pin,
+        radius,
+        property,
+        basemap,
+        zoom: view.zoom,
+        visible: ALL_LAYERS.filter((l) => visibility[l.id]).map((l) => l.id),
+        opacity,
+      };
+      const r = await saveReport(state);
+      const url = `${window.location.origin}/?report=${r.id}`;
+      try {
+        await navigator.clipboard.writeText(url);
+        toast.success("Share link copied", { description: url });
+      } catch {
+        toast.info("Share link ready", { description: url, duration: 10000 });
+      }
+      window.history.replaceState(null, "", `/?report=${r.id}`);
+    } catch {
+      toast.error("Could not create share link");
+    } finally {
+      setSharing(false);
+    }
   };
 
   const onCreatedCustom = (c) => setCustomLayers((prev) => [...prev, { ...c, visible: true, opacity: 100 }]);
@@ -108,22 +223,17 @@ export default function MapWorkstation() {
   const layerData = useMemo(() => {
     if (!proximityData?.categories) return {};
     const out = {};
-    for (const [cat, list] of Object.entries(proximityData.categories)) {
-      out[cat] = { features: list };
-    }
+    for (const [cat, list] of Object.entries(proximityData.categories)) out[cat] = { features: list };
     return out;
   }, [proximityData]);
 
   const counts = proximityData?.counts || {};
-
-  const focusPoi = (poi) => {
-    setPin([poi.lat, poi.lon]);
-    setZoom(17);
-  };
+  const focusPoi = (poi) => setView({ center: [poi.lat, poi.lon], zoom: 17 });
+  const capturing = clickPinMode || Array.isArray(drawPoints);
 
   return (
     <div className="flex h-screen w-screen flex-col overflow-hidden bg-[#0b0f17]">
-      <TopBar basemap={basemap} setBasemap={setBasemap} pin={pin} />
+      <TopBar basemap={basemap} setBasemap={setBasemap} pin={pin} onShare={onShare} onPrint={() => setReportOpen(true)} sharing={sharing} />
       <div className="flex flex-1 min-h-0">
         <LayerSidebar
           visibility={visibility}
@@ -138,26 +248,31 @@ export default function MapWorkstation() {
           onToggleCustom={onToggleCustom}
           onDeleteCustom={onDeleteCustom}
           onCustomOpacity={onCustomOpacity}
+          trafficEnabled={trafficCfg.enabled}
         />
-        <div className="relative flex-1 min-w-0">
+        <div className={`relative flex-1 min-w-0 ${capturing ? "map-capture-mode" : ""}`}>
           <MapView
             basemap={basemap}
-            center={center}
-            zoom={zoom}
+            view={view}
             pin={pin}
             onMapClick={onMapClick}
             clickPinMode={clickPinMode}
+            drawPoints={drawPoints}
+            property={property}
             radius={radius}
             layerData={layerData}
             layerVisibility={visibility}
             layerOpacity={opacity}
             customLayers={customLayers}
             onPoiClick={focusPoi}
+            trafficTileUrl={trafficCfg.enabled ? TRAFFIC_TILE_URL : null}
           />
           <Legend visibility={visibility} counts={counts} customLayers={customLayers} />
-          {clickPinMode && (
+          {capturing && (
             <div className="pointer-events-none absolute left-1/2 top-4 z-30 -translate-x-1/2 rounded-full border border-amber-400/30 bg-slate-900/90 px-4 py-1.5 backdrop-blur-xl">
-              <span className="font-mono text-xs uppercase tracking-widest text-amber-300">Click anywhere on the map</span>
+              <span className="font-mono text-xs uppercase tracking-widest text-amber-300" data-testid="capture-hint">
+                {Array.isArray(drawPoints) ? "Click to place property corners" : "Click anywhere on the map"}
+              </span>
             </div>
           )}
         </div>
@@ -171,9 +286,12 @@ export default function MapWorkstation() {
           proximityData={proximityData}
           loading={loadingPois}
           onFocusPoi={focusPoi}
+          env={env}
+          propertyTools={propertyTools}
         />
       </div>
       <UploadModal open={uploadOpen} onOpenChange={setUploadOpen} onCreated={onCreatedCustom} />
+      <PrintReport open={reportOpen} onClose={() => setReportOpen(false)} pin={pin} radius={radius} property={property} proximityData={proximityData} env={env} />
     </div>
   );
 }

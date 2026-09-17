@@ -50,3 +50,18 @@ export async function deleteCustomLayer(id) {
   const { data } = await api.delete(`/custom-layers/${id}`);
   return data;
 }
+
+export const TRAFFIC_TILE_URL = `${API}/traffic/tiles/{z}/{x}/{y}.png`;
+export async function fetchTrafficConfig() {
+  const { data } = await api.get("/traffic/config");
+  return data;
+}
+
+export async function saveReport(state) {
+  const { data } = await api.post("/reports", { state });
+  return data;
+}
+export async function loadReport(id) {
+  const { data } = await api.get(`/reports/${id}`);
+  return data;
+}
