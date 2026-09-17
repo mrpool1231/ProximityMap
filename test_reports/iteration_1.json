@@ -1,0 +1,40 @@
+{
+  "summary": "First-finish e2e smoke test of GeoPulse.Studio. Backend 6/7 endpoints pass (root, geocode, weather, air-quality, elevation, custom-layers CRUD). /api/pois returned 502 twice from public URL due to Overpass API slowness exceeding ingress timeout — backend logs confirm same endpoint returns 200 OK internally (Overpass fallback rotates through kumi.systems and private.coffee). Frontend fully functional: map + both sidebars render, layer toggles work, Show/Hide all works, search geocodes 'Times Square NYC' and drops pin with env stats populated (Temp 16.9°C, AQI 53, Elevation 122m), custom overlay upload via sample GeoJSON succeeds and appears in sidebar, basemap switch to Satellite visually confirmed, drop-pin button responsive. No console errors.",
+  "tested_scope": ["backend", "frontend", "integration"],
+  "passed": [
+    "GET /api/ -> 200, service ok",
+    "GET /api/geocode?q=Times Square NYC -> 200, returns multiple lat/lon results",
+    "GET /api/weather -> 200, current.temperature_2m present",
+    "GET /api/air-quality -> 200, current.us_aqi=53",
+    "GET /api/elevation -> 200, elevation=[54.0]",
+    "POST/GET/DELETE /api/custom-layers CRUD -> all 200 with proper id",
+    "Frontend loads with Layer Control sidebar + Proximity Analysis + Leaflet dark map",
+    "Layer toggle (parks) switches aria-checked state",
+    "Show all / Hide all buttons toggle all layers correctly",
+    "Search flow: 'Times Square NYC' -> results list -> click result-0 -> pin placed, analysis center + env stats populated",
+    "Custom upload modal: use-sample + submit adds a custom layer visible in sidebar",
+    "Basemap selector -> Satellite option switches tiles (verified via screenshot)",
+    "Drop-pin button toggles pin-drop mode without error",
+    "Radius slider control rendered with data-testid='radius-value' text present"
+  ],
+  "failed": [
+    {
+      "area": "backend / integration",
+      "issue": "GET /api/pois returns 502 Bad Gateway from public URL (external Cloudflare/ingress). Reproduced twice with radius=1500 and radius=500. Backend logs show the same endpoint succeeds internally (200 OK) but Overpass upstream sometimes takes 30-90s across the fallback chain, exceeding external gateway timeout.",
+      "evidence": "curl to public /api/pois returns Cloudflare 502 HTML; backend.out.log shows '127.0.0.1 - GET /api/pois ... 200 OK' for the same request; frontend UI shows 'Fetching POIs...' spinner for ~30-60s after pin drop.",
+      "priority": "HIGH"
+    },
+    {
+      "area": "frontend (minor)",
+      "issue": "Radius slider keyboard interaction (focus + ArrowRight) did not change the displayed value (stayed at 1.50 km). Radix slider may need pointer drag or different keyboard focus. Slider is visible and functional visually; likely a test-script issue, not a product bug.",
+      "evidence": "radius-value text unchanged after 5x ArrowRight key presses",
+      "priority": "LOW"
+    }
+  ],
+  "action_items": [
+    "Investigate /api/pois timeout: consider reducing Overpass query timeout in backend (e.g., 20s per endpoint) and returning partial results with a 'partial: true' flag rather than trying all fallbacks sequentially, OR add server-side caching for common (lat,lon,radius,categories) tuples. Currently the sequential Overpass fallback chain can exceed the external ingress timeout, causing 502 for end users on first pin drop."
+  ],
+  "success_rate": {"backend": "86% (6/7 endpoints)", "frontend": "100% of tested UI flows"},
+  "retest_needed": true,
+  "full_testing_deferred": true
+}

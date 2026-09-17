@@ -1,4 +1,5 @@
 import axios from "axios";
+import { queryPOIs, geocodeClient } from "@/lib/overpass";
 
 const BACKEND_URL = process.env.REACT_APP_BACKEND_URL;
 export const API = `${BACKEND_URL}/api`;
@@ -6,15 +7,22 @@ export const API = `${BACKEND_URL}/api`;
 export const api = axios.create({ baseURL: API, timeout: 40000 });
 
 export async function geocode(q) {
-  const { data } = await api.get("/geocode", { params: { q } });
-  return data.results || [];
+  // Try backend proxy first (adds User-Agent, avoids browser 429 headers), fall
+  // back to direct client call.
+  try {
+    const { data } = await api.get("/geocode", { params: { q }, timeout: 8000 });
+    if (data.results?.length) return data.results;
+  } catch {
+    /* fall through */
+  }
+  return geocodeClient(q);
 }
 
 export async function fetchPOIs({ lat, lon, radius, categories }) {
-  const { data } = await api.get("/pois", {
-    params: { lat, lon, radius, categories: categories.join(",") },
-  });
-  return data;
+  // Overpass calls happen directly from the browser to avoid the server IP
+  // being rate-limited / blocked. Backend has a /api/pois fallback but it is
+  // unreliable from this network environment.
+  return queryPOIs({ lat, lon, radius, categories });
 }
 
 export async function fetchWeather(lat, lon) {
