@@ -126,3 +126,43 @@ def test_custom_layers_crud(s):
     # Verify gone
     lr2 = s.get(f"{BASE_URL}/api/custom-layers", timeout=15)
     assert name not in [x["name"] for x in lr2.json()]
+
+
+# ---------- Reports (new in iteration 3) ----------
+def test_reports_create_get_and_404(s):
+    state = {"pin": {"lat": TS_LAT, "lon": TS_LON}, "radius": 800, "layers": {"parks": True}}
+    cr = s.post(f"{BASE_URL}/api/reports", json={"state": state}, timeout=15)
+    assert cr.status_code == 200, cr.text
+    body = cr.json()
+    assert "id" in body and isinstance(body["id"], str) and len(body["id"]) > 0
+    assert body["state"] == state
+    assert "created_at" in body
+
+    rid = body["id"]
+    gr = s.get(f"{BASE_URL}/api/reports/{rid}", timeout=15)
+    assert gr.status_code == 200
+    assert gr.json()["state"] == state
+
+    nf = s.get(f"{BASE_URL}/api/reports/does-not-exist-xyz", timeout=15)
+    assert nf.status_code == 404
+
+
+# ---------- Traffic config + tiles ----------
+def test_traffic_config_disabled(s):
+    r = s.get(f"{BASE_URL}/api/traffic/config", timeout=15)
+    assert r.status_code == 200
+    j = r.json()
+    assert j.get("enabled") is False
+    assert j.get("provider") == "TomTom"
+
+
+def test_traffic_tile_disabled_returns_404(s):
+    r = s.get(f"{BASE_URL}/api/traffic/tiles/12/1206/1539.png", timeout=15)
+    assert r.status_code == 404
+
+
+def test_traffic_tile_invalid_coords_returns_400(s):
+    # z=2 → max index 3, so x=4 is invalid
+    r = s.get(f"{BASE_URL}/api/traffic/tiles/2/4/0.png", timeout=15)
+    assert r.status_code == 400
+
