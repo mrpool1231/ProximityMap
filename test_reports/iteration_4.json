@@ -1,0 +1,40 @@
+{
+  "summary": "Iteration 4 - Stripe monetization testing. Backend payments API fully verified (products=$9, checkout→Stripe URL, status flow, 404, webhook signature validation). Frontend non-Pro gating, upgrade dialog, checkout redirect, cancel/success page rendering, and regression (property draw, layer toggles) all work. E2E automated Stripe UI completion could not be finished because Stripe managed_payments/Link widget requires interacting with non-standard form controls (hidden radio inputs, Link-based Pay button) that don't respond to standard Playwright selectors within reasonable time; however checkout URL/product/price/sandbox banner were visually verified on the Stripe page. One functional bug found: bogus localStorage license is not cleared on reload.",
+  "backend_issues": {"critical": [], "minor": []},
+  "frontend_issues": {
+    "ui_bugs": [
+      {
+        "component": "MapWorkstation.jsx license verification (useEffect ~line 100-108)",
+        "issue": "Bogus geopulse_license value is NOT cleared on reload. paymentStatus() returns 404 for unknown session_id, which hits the .catch(() => {}) handler and silently ignores the error. Only the success branch with payment_status!='paid' calls clearLicense(). Per spec: 'Reload the map with a bogus localStorage geopulse_license value → app falls back to non-Pro AND clears the bad license.' Non-Pro fallback works (isPro stays false, upgrade-button visible), but the invalid license persists in localStorage across reloads. Fix: in the .catch, also call clearLicense() when the status endpoint returns 404/error.",
+        "selector": "localStorage 'geopulse_license'",
+        "priority": "MEDIUM"
+      }
+    ],
+    "integration_issues": [],
+    "design_issues": []
+  },
+  "test_report_links": [
+    "/app/backend/tests/test_payments.py",
+    "/app/backend/tests/backend_test.py",
+    "/app/test_reports/pytest/pytest_iter4.xml"
+  ],
+  "action_items": [
+    "Fix license.js integration in MapWorkstation useEffect: clear geopulse_license when paymentStatus() rejects (404/network), not just when returned payment_status != 'paid'.",
+    "Manual verification recommended for full Stripe E2E flow (card 4242… → /payment/success → pro-badge → resume state → share creates ?report= URL → print overlay without paywall). Automation blocked by Stripe managed_payments Link widget's non-standard controls."
+  ],
+  "critical_code_review_comments": [
+    "payments.py: sk_test_emergent fallback in stripe.api_key is a smell — if STRIPE_SECRET_KEY isn't set the app will silently talk to a nonexistent test key. Consider failing fast.",
+    "payments.py get_status: fallback to Stripe.retrieve on every non-paid check is correct given webhook unreliability in preview, but adds an external call per status poll. Consider caching by sid for a short TTL if polling from many clients.",
+    "MapWorkstation.jsx license effect: swallowing all errors with catch(()=>{}) hides legitimate failures (network, 500) that should be distinguished from 'not paid'. Rework to differentiate 404-not-found (clear license) vs transient errors (leave license, retry)."
+  ],
+  "updated_files": [
+    "/app/backend/tests/test_payments.py (new)"
+  ],
+  "success_rate": {"backend": "100% (17/17)", "frontend": "~85% (gating, redirect, regression verified; full Stripe payment completion not automated)"},
+  "test_credentials": "Stripe test card 4242 4242 4242 4242, any future expiry, any CVC. No app auth required.",
+  "seed_data_creation": "None. Stripe prices/products auto-managed via /app/backend/setup_stripe.py. Test payment_transactions rows are created by checkout tests (session_id 'initiated' status only, no cleanup required as they are ephemeral test sessions).",
+  "retest_needed": true,
+  "main_agent_can_self_test": true,
+  "context_for_next_testing_agent": "Backend payments API fully covered by /app/backend/tests/test_payments.py (5 tests, all pass). Frontend Pro gating, upgrade dialog, Stripe checkout redirect, /payment/cancel and /payment/success page rendering, and regression flows are verified. NOT automated: full Stripe UI form completion (Stripe managed_payments + Link widget makes selectors non-standard — email uses placeholder='email@example.com', card radio is hidden input[value='card'], submit button lives inside Link's Pay widget). If retesting E2E, either manually complete a $9 Stripe test payment or mock the paid state by seeding a real completed checkout session_id in mongo payment_transactions then setting localStorage.geopulse_license. Known bug: bogus license not cleared on reload — see action_items.",
+  "rca of the issue": "Bogus license bug RCA: In MapWorkstation.jsx useEffect (lines ~100-108), paymentStatus(license).then(s => { if paid setIsPro else clearLicense }).catch(() => {}). For a bogus session_id the backend returns 404 which throws in the axios/fetch client → falls into .catch which is a no-op. Result: isPro stays false (correct non-Pro fallback), but license stays in localStorage. Reproduction: localStorage.setItem('geopulse_license','cs_bogus_xyz'); location.reload(); after ~3s → upgrade-button visible (good) BUT localStorage.getItem('geopulse_license') === 'cs_bogus_xyz' (bad). Mitigation: in the .catch handler, inspect error status and call clearLicense() on 404, or unconditionally clearLicense() on any error since a valid license must poll successfully."
+}

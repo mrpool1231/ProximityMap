@@ -104,7 +104,9 @@ export default function MapWorkstation() {
           if (s.payment_status === "paid") setIsPro(true);
           else clearLicense();
         })
-        .catch(() => {});
+        .catch((e) => {
+          if (e?.response?.status === 404) clearLicense();
+        });
     }
     const resume = popResumeState();
     if (resume) {
