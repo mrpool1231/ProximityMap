@@ -6,6 +6,7 @@ import TopBar from "@/components/map/TopBar";
 import Legend from "@/components/map/Legend";
 import UploadModal from "@/components/map/UploadModal";
 import PrintReport from "@/components/map/PrintReport";
+import UpgradeDialog from "@/components/map/UpgradeDialog";
 import { DEFAULT_CENTER, DEFAULT_ZOOM, POI_LAYERS, ENV_LAYERS, CONCEPT_LAYERS } from "@/lib/mapConfig";
 import {
   fetchPOIs,
@@ -17,9 +18,11 @@ import {
   fetchWeather,
   fetchAirQuality,
   fetchElevation,
+  paymentStatus,
   TRAFFIC_TILE_URL,
 } from "@/lib/api";
 import { propertyCentroid, propertyReach, applyPropertyDistances } from "@/lib/geo";
+import { getLicense, clearLicense, stashResumeState, popResumeState } from "@/lib/license";
 import { toast } from "sonner";
 
 const ALL_LAYERS = [...POI_LAYERS, ...ENV_LAYERS, ...CONCEPT_LAYERS];
@@ -59,6 +62,8 @@ export default function MapWorkstation() {
   const [reportOpen, setReportOpen] = useState(false);
   const [trafficCfg, setTrafficCfg] = useState({ enabled: false });
   const [sharing, setSharing] = useState(false);
+  const [isPro, setIsPro] = useState(false);
+  const [upgrade, setUpgrade] = useState(null); // null | { reason }
 
   const activePoiLayers = useMemo(
     () => POI_LAYERS.filter((l) => visibility[l.id]).map((l) => l.id),
@@ -92,6 +97,20 @@ export default function MapWorkstation() {
       .then((rows) => setCustomLayers(rows.map((r) => ({ ...r, visible: true, opacity: 100 }))))
       .catch(() => {});
     fetchTrafficConfig().then(setTrafficCfg).catch(() => {});
+    const license = getLicense();
+    if (license) {
+      paymentStatus(license)
+        .then((s) => {
+          if (s.payment_status === "paid") setIsPro(true);
+          else clearLicense();
+        })
+        .catch(() => {});
+    }
+    const resume = popResumeState();
+    if (resume) {
+      restoreReport(resume);
+      return;
+    }
     const id = new URLSearchParams(window.location.search).get("report");
     if (id) {
       loadReport(id)
@@ -179,19 +198,24 @@ export default function MapWorkstation() {
     onClear: () => setProperty(null),
   };
 
+  const snapshotState = () => ({
+    pin,
+    radius,
+    property,
+    basemap,
+    zoom: view.zoom,
+    visible: ALL_LAYERS.filter((l) => visibility[l.id]).map((l) => l.id),
+    opacity,
+  });
+
   const onShare = async () => {
+    if (!isPro) {
+      setUpgrade({ reason: "Share links are a Pro feature" });
+      return;
+    }
     setSharing(true);
     try {
-      const state = {
-        pin,
-        radius,
-        property,
-        basemap,
-        zoom: view.zoom,
-        visible: ALL_LAYERS.filter((l) => visibility[l.id]).map((l) => l.id),
-        opacity,
-      };
-      const r = await saveReport(state);
+      const r = await saveReport(snapshotState());
       const url = `${window.location.origin}/?report=${r.id}`;
       try {
         await navigator.clipboard.writeText(url);
@@ -205,6 +229,14 @@ export default function MapWorkstation() {
     } finally {
       setSharing(false);
     }
+  };
+
+  const onPrint = () => {
+    if (!isPro) {
+      setUpgrade({ reason: "PDF property briefs are a Pro feature" });
+      return;
+    }
+    setReportOpen(true);
   };
 
   const onCreatedCustom = (c) => setCustomLayers((prev) => [...prev, { ...c, visible: true, opacity: 100 }]);
@@ -233,7 +265,16 @@ export default function MapWorkstation() {
 
   return (
     <div className="flex h-screen w-screen flex-col overflow-hidden bg-[#0b0f17]">
-      <TopBar basemap={basemap} setBasemap={setBasemap} pin={pin} onShare={onShare} onPrint={() => setReportOpen(true)} sharing={sharing} />
+      <TopBar
+        basemap={basemap}
+        setBasemap={setBasemap}
+        pin={pin}
+        onShare={onShare}
+        onPrint={onPrint}
+        sharing={sharing}
+        isPro={isPro}
+        onUpgrade={() => setUpgrade({ reason: "Unlock GeoPulse Pro" })}
+      />
       <div className="flex flex-1 min-h-0">
         <LayerSidebar
           visibility={visibility}
@@ -292,6 +333,12 @@ export default function MapWorkstation() {
       </div>
       <UploadModal open={uploadOpen} onOpenChange={setUploadOpen} onCreated={onCreatedCustom} />
       <PrintReport open={reportOpen} onClose={() => setReportOpen(false)} pin={pin} radius={radius} property={property} proximityData={proximityData} env={env} />
+      <UpgradeDialog
+        open={!!upgrade}
+        onOpenChange={(v) => !v && setUpgrade(null)}
+        reason={upgrade?.reason}
+        onBeforeCheckout={() => pin && stashResumeState(snapshotState())}
+      />
     </div>
   );
 }

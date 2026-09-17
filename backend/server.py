@@ -360,6 +360,9 @@ async def traffic_tile(z: int = FPath(ge=0, le=22), x: int = FPath(ge=0), y: int
 
 
 app.include_router(api_router)
+from payments import payments_router, webhook_router  # noqa: E402
+app.include_router(payments_router)
+app.include_router(webhook_router)
 
 app.add_middleware(
     CORSMiddleware,

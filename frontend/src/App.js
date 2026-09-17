@@ -2,6 +2,8 @@ import "@/App.css";
 import { BrowserRouter, Routes, Route } from "react-router-dom";
 import { Toaster } from "@/components/ui/sonner";
 import MapWorkstation from "@/pages/MapWorkstation";
+import PaymentSuccess from "@/pages/PaymentSuccess";
+import PaymentCancel from "@/pages/PaymentCancel";
 
 function App() {
   return (
@@ -9,6 +11,8 @@ function App() {
       <BrowserRouter>
         <Routes>
           <Route path="/" element={<MapWorkstation />} />
+          <Route path="/payment/success" element={<PaymentSuccess />} />
+          <Route path="/payment/cancel" element={<PaymentCancel />} />
         </Routes>
       </BrowserRouter>
       <Toaster theme="dark" position="bottom-right" richColors />

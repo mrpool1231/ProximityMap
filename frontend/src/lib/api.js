@@ -65,3 +65,16 @@ export async function loadReport(id) {
   const { data } = await api.get(`/reports/${id}`);
   return data;
 }
+
+export async function fetchProducts() {
+  const { data } = await api.get("/payments/products");
+  return data.products;
+}
+export async function createCheckout(lookup_key) {
+  const { data } = await api.post("/payments/checkout", { lookup_key, origin_url: window.location.origin });
+  return data;
+}
+export async function paymentStatus(sessionId) {
+  const { data } = await api.get(`/payments/status/${sessionId}`);
+  return data;
+}

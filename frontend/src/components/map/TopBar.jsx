@@ -1,9 +1,9 @@
 import { Button } from "@/components/ui/button";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger, DropdownMenuLabel, DropdownMenuSeparator } from "@/components/ui/dropdown-menu";
 import { BASEMAPS } from "@/lib/mapConfig";
-import { Compass, Layers2, Github, Share2, Printer, Loader2 } from "lucide-react";
+import { Compass, Layers2, Github, Share2, Printer, Loader2, Sparkles, Lock } from "lucide-react";
 
-export default function TopBar({ basemap, setBasemap, pin, onShare, onPrint, sharing }) {
+export default function TopBar({ basemap, setBasemap, pin, onShare, onPrint, sharing, isPro, onUpgrade }) {
   return (
     <header
       className="relative z-40 flex h-14 items-center justify-between border-b border-white/5 bg-[#0b0f17]/95 px-4 backdrop-blur-xl"
@@ -32,6 +32,21 @@ export default function TopBar({ basemap, setBasemap, pin, onShare, onPrint, sha
             </span>
           </div>
         )}
+        {isPro ? (
+          <span className="hidden items-center gap-1.5 rounded-full border border-amber-400/30 bg-amber-400/10 px-3 py-1 font-mono text-[10px] uppercase tracking-widest text-amber-300 md:flex" data-testid="pro-badge">
+            <Sparkles size={11} /> Pro
+          </span>
+        ) : (
+          <Button
+            size="sm"
+            onClick={onUpgrade}
+            className="h-9 bg-amber-500 text-slate-950 hover:bg-amber-400"
+            data-testid="upgrade-button"
+          >
+            <Sparkles size={13} className="mr-2" />
+            Go Pro
+          </Button>
+        )}
         <Button
           variant="outline"
           size="sm"
@@ -40,7 +55,7 @@ export default function TopBar({ basemap, setBasemap, pin, onShare, onPrint, sha
           className="h-9 border-white/10 bg-slate-900/60 text-slate-200 hover:border-emerald-400/40 hover:bg-emerald-400/5 hover:text-emerald-300 disabled:opacity-40"
           data-testid="share-report-button"
         >
-          {sharing ? <Loader2 size={13} className="mr-2 animate-spin" /> : <Share2 size={13} className="mr-2" />}
+          {sharing ? <Loader2 size={13} className="mr-2 animate-spin" /> : isPro ? <Share2 size={13} className="mr-2" /> : <Lock size={13} className="mr-2 text-amber-400" />}
           Share
         </Button>
         <Button
@@ -51,7 +66,7 @@ export default function TopBar({ basemap, setBasemap, pin, onShare, onPrint, sha
           className="h-9 border-white/10 bg-slate-900/60 text-slate-200 hover:border-amber-400/40 hover:bg-amber-400/5 hover:text-amber-300 disabled:opacity-40"
           data-testid="print-report-button"
         >
-          <Printer size={13} className="mr-2" />
+          {isPro ? <Printer size={13} className="mr-2" /> : <Lock size={13} className="mr-2 text-amber-400" />}
           Print brief
         </Button>
         <DropdownMenu>
