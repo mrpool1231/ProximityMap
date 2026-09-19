@@ -6,6 +6,7 @@ import { Printer, X, Compass } from "lucide-react";
 import { LAYER_BY_ID } from "@/lib/mapConfig";
 import { propertyBuffer, bufferBounds } from "@/lib/geo";
 import { BufferOverlay } from "@/components/map/MapView";
+import { authApi } from "@/lib/api";
 
 const fmtDist = (m) => (m < 1000 ? `${Math.round(m)} m` : `${(m / 1000).toFixed(2)} km`);
 
@@ -21,13 +22,17 @@ function Stat({ label, value, unit }) {
   );
 }
 
-export default function PrintReport({ open, onClose, pin, radius, property, proximityData, env }) {
+export default function PrintReport({ open, onClose, pin, radius, property, propertyB, proximityData, dataB, env, branding }) {
   if (!open || !pin) return null;
-  const bounds = property ? bufferBounds(propertyBuffer(property, radius)) : L.latLng(pin).toBounds(radius * 2.3);
+  const bufferA = property ? propertyBuffer(property, radius) : null;
+  let bounds = bufferA ? bufferBounds(bufferA) : L.latLng(pin).toBounds(radius * 2.3);
+  if (propertyB) bounds = L.latLngBounds(bounds).extend(L.latLngBounds(bufferBounds(propertyBuffer(propertyB, radius))));
   const w = env?.weather?.current;
   const a = env?.aqi?.current;
   const elev = env?.elev?.elevation?.[0];
   const cats = Object.entries(proximityData?.categories || {}).filter(([, l]) => l.length > 0);
+  const catsB = Object.entries(dataB?.categories || {}).filter(([, l]) => l.length > 0);
+  const hasBrand = branding && (branding.logo_path || branding.company || branding.contact_name);
   const pinIcon = L.divIcon({ html: `<div style="width:14px;height:14px;border-radius:999px;background:#0284c7;border:3px solid #fff;box-shadow:0 0 0 2px #0284c7"></div>`, className: "", iconSize: [14, 14], iconAnchor: [7, 7] });
 
   return createPortal(
@@ -45,6 +50,23 @@ export default function PrintReport({ open, onClose, pin, radius, property, prox
       </div>
 
       <article className="mx-auto max-w-[210mm] bg-white px-10 py-8 print:px-0 print:py-0">
+        {hasBrand && (
+          <div className="mb-4 flex items-center justify-between rounded-lg border border-slate-200 px-4 py-3" data-testid="report-branding">
+            <div className="flex items-center gap-4">
+              {branding.logo_path && <img src={authApi.logoUrl(branding.logo_version)} alt="" className="max-h-12 max-w-[140px] object-contain" data-testid="report-logo" />}
+              <div>
+                {branding.company && <div className="font-heading text-base font-bold">{branding.company}</div>}
+                {branding.tagline && <div className="text-xs text-slate-500">{branding.tagline}</div>}
+              </div>
+            </div>
+            <div className="text-right text-xs text-slate-600">
+              {branding.contact_name && <div className="font-semibold text-slate-800">{branding.contact_name}</div>}
+              {branding.phone && <div>{branding.phone}</div>}
+              {branding.email && <div>{branding.email}</div>}
+              {branding.website && <div>{branding.website}</div>}
+            </div>
+          </div>
+        )}
         <header className="mb-6 flex items-start justify-between border-b-2 border-slate-900 pb-4">
           <div>
             <div className="flex items-center gap-2 text-[11px] font-mono uppercase tracking-[0.2em] text-slate-500">
@@ -63,14 +85,46 @@ export default function PrintReport({ open, onClose, pin, radius, property, prox
           <MapContainer bounds={bounds} className="h-full w-full" zoomControl={false} dragging={false} scrollWheelZoom={false} doubleClickZoom={false} touchZoom={false} keyboard={false} preferCanvas>
             <TileLayer url="https://tile.openstreetmap.org/{z}/{x}/{y}.png" attribution="&copy; OpenStreetMap" className="map-tiles-light" />
             <BufferOverlay pin={pin} radius={radius} property={property} />
+            {propertyB && <BufferOverlay radius={radius} property={propertyB} variant="B" />}
             <Marker position={pin} icon={pinIcon} />
-            {cats.flatMap(([cat, list]) =>
-              list.map((p) => (
-                <CircleMarker key={`${cat}-${p.id}`} center={[p.lat, p.lon]} radius={5} pathOptions={{ color: "#fff", weight: 1.5, fillColor: LAYER_BY_ID[cat]?.color, fillOpacity: 1 }} />
-              ))
-            )}
+            {[...new Map([...cats, ...catsB].flatMap(([cat, list]) => list.map((p) => [`${cat}-${p.id}`, [cat, p]]))).entries()].map(([key, [cat, p]]) => (
+              <CircleMarker key={key} center={[p.lat, p.lon]} radius={5} pathOptions={{ color: "#fff", weight: 1.5, fillColor: LAYER_BY_ID[cat]?.color, fillOpacity: 1 }} />
+            ))}
           </MapContainer>
         </div>
+
+        {propertyB && dataB && (
+          <section className="mb-6 break-inside-avoid" data-testid="report-compare">
+            <h2 className="mb-2 font-heading text-lg font-semibold">Property A vs Property B</h2>
+            <table className="w-full text-xs">
+              <thead>
+                <tr className="border-b border-slate-300 text-left text-[10px] font-mono uppercase tracking-widest text-slate-500">
+                  <th className="py-1">Category</th>
+                  <th className="py-1 text-right text-amber-600">A · count / nearest</th>
+                  <th className="py-1 text-right text-teal-600">B · count / nearest</th>
+                </tr>
+              </thead>
+              <tbody>
+                {Object.keys({ ...proximityData?.categories, ...dataB.categories }).map((cat) => {
+                  const la = proximityData?.categories?.[cat] || [];
+                  const lb = dataB.categories?.[cat] || [];
+                  return (
+                    <tr key={cat} className="border-b border-slate-100">
+                      <td className="py-1">{LAYER_BY_ID[cat]?.label || cat}</td>
+                      <td className="py-1 text-right font-mono">{la.length} / {la[0] ? fmtDist(la[0].distance_m) : "—"}</td>
+                      <td className="py-1 text-right font-mono">{lb.length} / {lb[0] ? fmtDist(lb[0].distance_m) : "—"}</td>
+                    </tr>
+                  );
+                })}
+                <tr className="font-semibold">
+                  <td className="py-1">Total</td>
+                  <td className="py-1 text-right font-mono">{proximityData?.total ?? 0}</td>
+                  <td className="py-1 text-right font-mono">{dataB.total}</td>
+                </tr>
+              </tbody>
+            </table>
+          </section>
+        )}
 
         <section className="mb-6 grid grid-cols-5 gap-2">
           <Stat label="Temperature" value={w?.temperature_2m} unit="°C" />

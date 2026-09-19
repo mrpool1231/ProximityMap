@@ -3,16 +3,17 @@ from datetime import datetime, timezone
 from typing import Optional
 
 import stripe
-from fastapi import APIRouter, HTTPException, Request
-from motor.motor_asyncio import AsyncIOMotorClient
+from fastapi import APIRouter, HTTPException, Request, Depends
 from pydantic import BaseModel, Field
+
+from core import db
+from auth import get_optional_user
 
 stripe.api_key = os.environ.get("STRIPE_SECRET_KEY") or "sk_test_emergent"
 STRIPE_WEBHOOK_SECRET = os.environ.get("STRIPE_WEBHOOK_SECRET", "")
 TAX_MODE = "full"
 
-_db = AsyncIOMotorClient(os.environ["MONGO_URL"])[os.environ["DB_NAME"]]
-payment_transactions = _db["payment_transactions"]
+payment_transactions = db["payment_transactions"]
 
 payments_router = APIRouter(prefix="/api/payments")
 
@@ -36,6 +37,13 @@ def _now():
     return datetime.now(timezone.utc)
 
 
+async def _mark_paid(session_id: str, fields: dict):
+    await payment_transactions.update_one({"session_id": session_id, "payment_status": {"$ne": "paid"}}, {"$set": {"status": "completed", "payment_status": "paid", **fields, "updated_at": _now()}})
+    tx = await payment_transactions.find_one({"session_id": session_id})
+    if tx and tx.get("user_id"):
+        await db.users.update_one({"id": tx["user_id"]}, {"$set": {"is_pro": True, "pro_session_id": session_id}})
+
+
 @payments_router.get("/products")
 async def list_products():
     out = []
@@ -49,9 +57,10 @@ async def list_products():
 
 
 @payments_router.post("/checkout")
-async def create_checkout(req: CheckoutRequest):
+async def create_checkout(req: CheckoutRequest, user: Optional[dict] = Depends(get_optional_user)):
     if req.lookup_key not in PRODUCTS:
         raise HTTPException(400, "unknown product")
+    user_id = user["id"] if user else req.user_id
     prices = stripe.Price.list(lookup_keys=[req.lookup_key], active=True, limit=1).data
     if not prices:
         raise HTTPException(500, f"Price not found: {req.lookup_key}")
@@ -61,7 +70,7 @@ async def create_checkout(req: CheckoutRequest):
         mode="subscription" if price.recurring else "payment",
         success_url=f"{req.origin_url}/payment/success?session_id={{CHECKOUT_SESSION_ID}}",
         cancel_url=f"{req.origin_url}/payment/cancel",
-        metadata={"user_id": req.user_id or "", "lookup_key": req.lookup_key},
+        metadata={"user_id": user_id or "", "lookup_key": req.lookup_key},
     )
     try:
         if TAX_MODE == "full":
@@ -80,7 +89,7 @@ async def create_checkout(req: CheckoutRequest):
 
     await payment_transactions.insert_one({
         "session_id": session.id,
-        "user_id": req.user_id,
+        "user_id": user_id,
         "lookup_key": req.lookup_key,
         "amount": (price.unit_amount or 0) * req.quantity,
         "currency": price.currency,
@@ -101,11 +110,7 @@ async def get_status(session_id: str):
         try:
             s = stripe.checkout.Session.retrieve(session_id)
             if s.payment_status == "paid" or s.status == "complete":
-                await payment_transactions.update_one(
-                    {"session_id": session_id, "payment_status": {"$ne": "paid"}},
-                    {"$set": {"status": "completed", "payment_status": "paid", "stripe_subscription_id": s.subscription,
-                              "stripe_payment_intent_id": s.payment_intent, "updated_at": _now()}},
-                )
+                await _mark_paid(session_id, {"stripe_subscription_id": s.subscription, "stripe_payment_intent_id": s.payment_intent})
                 record = await payment_transactions.find_one({"session_id": session_id})
         except stripe.error.StripeError:
             pass
@@ -125,13 +130,9 @@ async def stripe_webhook(request: Request):
         raise HTTPException(400, "Invalid signature")
     obj, t = event["data"]["object"], event["type"]
     if t == "checkout.session.completed":
-        await payment_transactions.update_one(
-            {"session_id": obj["id"], "payment_status": {"$ne": "paid"}},
-            {"$set": {"status": "completed", "payment_status": obj.get("payment_status", "paid"), "stripe_subscription_id": obj.get("subscription"),
-                      "stripe_payment_intent_id": obj.get("payment_intent"), "updated_at": _now()}},
-        )
+        await _mark_paid(obj["id"], {"stripe_subscription_id": obj.get("subscription"), "stripe_payment_intent_id": obj.get("payment_intent")})
     elif t == "checkout.session.async_payment_succeeded":
-        await payment_transactions.update_one({"session_id": obj["id"]}, {"$set": {"payment_status": "paid", "updated_at": _now()}})
+        await _mark_paid(obj["id"], {})
     elif t == "checkout.session.async_payment_failed":
         await payment_transactions.update_one({"session_id": obj["id"]}, {"$set": {"status": "failed", "payment_status": "failed", "updated_at": _now()}})
     elif t == "checkout.session.expired":

@@ -4,6 +4,7 @@ import { Button } from "@/components/ui/button";
 import { CheckCircle2, Loader2, XCircle, Compass } from "lucide-react";
 import { paymentStatus } from "@/lib/api";
 import { setLicense } from "@/lib/license";
+import { useAuth } from "@/context/AuthContext";
 
 const MAX_POLLS = 8;
 
@@ -12,6 +13,7 @@ export default function PaymentSuccess() {
   const sessionId = params.get("session_id");
   const [state, setState] = useState("checking"); // checking | paid | pending | error
   const polls = useRef(0);
+  const { refresh } = useAuth();
 
   useEffect(() => {
     if (!sessionId) {
@@ -24,6 +26,7 @@ export default function PaymentSuccess() {
         const s = await paymentStatus(sessionId);
         if (s.payment_status === "paid") {
           setLicense(sessionId);
+          refresh();
           setState("paid");
           return;
         }
@@ -41,6 +44,7 @@ export default function PaymentSuccess() {
     };
     poll();
     return () => clearTimeout(timer);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [sessionId]);
 
   return (

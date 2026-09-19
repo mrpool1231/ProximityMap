@@ -2,8 +2,9 @@ import { Button } from "@/components/ui/button";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger, DropdownMenuLabel, DropdownMenuSeparator } from "@/components/ui/dropdown-menu";
 import { BASEMAPS } from "@/lib/mapConfig";
 import { Compass, Layers2, Github, Share2, Printer, Loader2, Sparkles, Lock } from "lucide-react";
+import AccountMenu from "@/components/map/AccountMenu";
 
-export default function TopBar({ basemap, setBasemap, pin, onShare, onPrint, sharing, isPro, onUpgrade }) {
+export default function TopBar({ basemap, setBasemap, pin, onShare, onPrint, sharing, isPro, onUpgrade, onSignIn, onBranding }) {
   return (
     <header
       className="relative z-40 flex h-14 items-center justify-between border-b border-white/5 bg-[#0b0f17]/95 px-4 backdrop-blur-xl"
@@ -98,6 +99,7 @@ export default function TopBar({ basemap, setBasemap, pin, onShare, onPrint, sha
             ))}
           </DropdownMenuContent>
         </DropdownMenu>
+        <AccountMenu onSignIn={onSignIn} onBranding={onBranding} />
         <a
           href="https://www.openstreetmap.org/copyright"
           target="_blank"

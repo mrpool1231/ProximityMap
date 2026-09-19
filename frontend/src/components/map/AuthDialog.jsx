@@ -1,0 +1,88 @@
+import { useState } from "react";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
+import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
+import { Input } from "@/components/ui/input";
+import { Button } from "@/components/ui/button";
+import { Loader2, LogIn, UserPlus } from "lucide-react";
+import { useAuth } from "@/context/AuthContext";
+import { formatApiError } from "@/lib/api";
+import { toast } from "sonner";
+
+const inputCls = "h-10 border-white/10 bg-slate-900/60 text-slate-100 placeholder:text-slate-500 focus-visible:ring-sky-400/40";
+
+function AuthForm({ mode, onDone }) {
+  const { login, register } = useAuth();
+  const [email, setEmail] = useState("");
+  const [password, setPassword] = useState("");
+  const [name, setName] = useState("");
+  const [error, setError] = useState("");
+  const [busy, setBusy] = useState(false);
+
+  const submit = async (e) => {
+    e.preventDefault();
+    setBusy(true);
+    setError("");
+    try {
+      const u = mode === "login" ? await login(email, password) : await register(email, password, name);
+      toast.success(mode === "login" ? `Welcome back, ${u.name}` : "Account created");
+      onDone();
+    } catch (err) {
+      setError(formatApiError(err.response?.data?.detail, err.message));
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  return (
+    <form onSubmit={submit} className="space-y-3" data-testid={`${mode}-form`}>
+      {mode === "register" && (
+        <Input placeholder="Your name" value={name} onChange={(e) => setName(e.target.value)} className={inputCls} data-testid="auth-name-input" />
+      )}
+      <Input type="email" required placeholder="Email" value={email} onChange={(e) => setEmail(e.target.value)} className={inputCls} data-testid="auth-email-input" />
+      <Input
+        type="password"
+        required
+        minLength={8}
+        placeholder={mode === "register" ? "Password (8+ characters)" : "Password"}
+        value={password}
+        onChange={(e) => setPassword(e.target.value)}
+        className={inputCls}
+        data-testid="auth-password-input"
+      />
+      {error && (
+        <p className="rounded-md border border-red-500/30 bg-red-500/10 px-3 py-2 text-xs text-red-300" data-testid="auth-error">
+          {error}
+        </p>
+      )}
+      <Button type="submit" disabled={busy} className="h-10 w-full bg-sky-500 text-slate-950 hover:bg-sky-400" data-testid="auth-submit-button">
+        {busy ? <Loader2 size={14} className="mr-2 animate-spin" /> : mode === "login" ? <LogIn size={14} className="mr-2" /> : <UserPlus size={14} className="mr-2" />}
+        {mode === "login" ? "Sign in" : "Create account"}
+      </Button>
+    </form>
+  );
+}
+
+export default function AuthDialog({ open, onOpenChange, defaultTab = "login" }) {
+  return (
+    <Dialog open={open} onOpenChange={onOpenChange}>
+      <DialogContent className="max-w-sm border-white/10 bg-[#0b0f17] text-slate-100" data-testid="auth-dialog">
+        <DialogHeader>
+          <DialogTitle className="font-heading text-xl">Your GeoPulse account</DialogTitle>
+          <DialogDescription className="text-slate-400">Sign in so your Pro pass and brief branding follow you to any device.</DialogDescription>
+        </DialogHeader>
+        <Tabs defaultValue={defaultTab}>
+          <TabsList className="grid w-full grid-cols-2 bg-slate-900/60">
+            <TabsTrigger value="login" data-testid="auth-tab-login">Sign in</TabsTrigger>
+            <TabsTrigger value="register" data-testid="auth-tab-register">Create account</TabsTrigger>
+          </TabsList>
+          <TabsContent value="login" className="pt-3">
+            <AuthForm mode="login" onDone={() => onOpenChange(false)} />
+          </TabsContent>
+          <TabsContent value="register" className="pt-3">
+            <AuthForm mode="register" onDone={() => onOpenChange(false)} />
+          </TabsContent>
+        </Tabs>
+      </DialogContent>
+    </Dialog>
+  );
+}

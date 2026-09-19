@@ -9,6 +9,7 @@ import { MapPin, Search, Crosshair, Loader2, Target, ChevronRight, CloudRain, Wi
 import { geocode } from "@/lib/api";
 import { LAYER_BY_ID } from "@/lib/mapConfig";
 import PropertyTools from "@/components/map/PropertyTools";
+import CompareScorecard from "@/components/map/CompareScorecard";
 import { toast } from "sonner";
 
 function fmtDist(m) {
@@ -42,6 +43,7 @@ export default function ProximityPanel({
   onFocusPoi,
   env,
   propertyTools,
+  compare,
 }) {
   const [q, setQ] = useState("");
   const [results, setResults] = useState([]);
@@ -210,6 +212,8 @@ export default function ProximityPanel({
                   color="#84CC16"
                 />
               </div>
+
+              {compare?.propertyB && proximityData && <CompareScorecard dataA={proximityData} dataB={compare.dataB} loadingB={compare.loadingB} />}
 
               {loading && (
                 <div className="flex items-center justify-center py-6 text-slate-400">

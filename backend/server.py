@@ -361,8 +361,21 @@ async def traffic_tile(z: int = FPath(ge=0, le=22), x: int = FPath(ge=0), y: int
 
 app.include_router(api_router)
 from payments import payments_router, webhook_router  # noqa: E402
+from auth import auth_router, seed_admin, ensure_indexes  # noqa: E402
+from storage import init_storage  # noqa: E402
 app.include_router(payments_router)
 app.include_router(webhook_router)
+app.include_router(auth_router)
+
+
+@app.on_event("startup")
+async def startup():
+    await ensure_indexes()
+    await seed_admin()
+    try:
+        init_storage()
+    except Exception as e:
+        logging.getLogger(__name__).error(f"Storage init failed: {e}")
 
 app.add_middleware(
     CORSMiddleware,

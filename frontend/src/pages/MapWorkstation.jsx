@@ -7,6 +7,9 @@ import Legend from "@/components/map/Legend";
 import UploadModal from "@/components/map/UploadModal";
 import PrintReport from "@/components/map/PrintReport";
 import UpgradeDialog from "@/components/map/UpgradeDialog";
+import AuthDialog from "@/components/map/AuthDialog";
+import BrandingDialog from "@/components/map/BrandingDialog";
+import { useAuth } from "@/context/AuthContext";
 import { DEFAULT_CENTER, DEFAULT_ZOOM, POI_LAYERS, ENV_LAYERS, CONCEPT_LAYERS } from "@/lib/mapConfig";
 import {
   fetchPOIs,
@@ -48,7 +51,11 @@ export default function MapWorkstation() {
   const [radius, setRadius] = useState(1500);
   const [clickPinMode, setClickPinMode] = useState(false);
   const [property, setProperty] = useState(null); // [[lat, lon], ...]
+  const [propertyB, setPropertyB] = useState(null);
   const [drawPoints, setDrawPoints] = useState(null); // null = not drawing
+  const [drawTarget, setDrawTarget] = useState("A");
+  const [dataB, setDataB] = useState(null);
+  const [loadingB, setLoadingB] = useState(false);
 
   const [visibility, setVisibility] = useState(initialVisibility);
   const [opacity, setOpacity] = useState(initialOpacity);
@@ -64,6 +71,10 @@ export default function MapWorkstation() {
   const [sharing, setSharing] = useState(false);
   const [isPro, setIsPro] = useState(false);
   const [upgrade, setUpgrade] = useState(null); // null | { reason }
+  const [authOpen, setAuthOpen] = useState(false);
+  const [brandingOpen, setBrandingOpen] = useState(false);
+  const { user } = useAuth();
+  const pro = isPro || !!user?.is_pro;
 
   const activePoiLayers = useMemo(
     () => POI_LAYERS.filter((l) => visibility[l.id]).map((l) => l.id),
@@ -83,6 +94,7 @@ export default function MapWorkstation() {
       if (s.opacity) setOpacity((prev) => ({ ...prev, ...s.opacity }));
       if (s.basemap) setBasemap(s.basemap);
       if (s.radius) setRadius(s.radius);
+      setPropertyB(s.propertyB?.length >= 3 ? s.propertyB : null);
       if (s.property?.length >= 3) applyProperty(s.property, s.zoom || 16);
       else if (s.pin) {
         setPin(s.pin);
@@ -143,6 +155,25 @@ export default function MapWorkstation() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [pin?.[0], pin?.[1], radius, activePoiLayers.join(","), property]);
 
+  // Property B (comparison) POIs
+  useEffect(() => {
+    if (!propertyB || activePoiLayers.length === 0) {
+      setDataB(null);
+      return;
+    }
+    let alive = true;
+    setLoadingB(true);
+    const [lat, lon] = propertyCentroid(propertyB);
+    fetchPOIs({ lat, lon, radius: Math.round(radius + propertyReach(propertyB)), categories: activePoiLayers })
+      .then((d) => alive && setDataB(applyPropertyDistances(d, propertyB, radius)))
+      .catch(() => alive && toast.error("Property B POI fetch failed"))
+      .finally(() => alive && setLoadingB(false));
+    return () => {
+      alive = false;
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [propertyB, radius, activePoiLayers.join(",")]);
+
   useEffect(() => {
     if (!pin) return;
     let alive = true;
@@ -162,6 +193,7 @@ export default function MapWorkstation() {
 
   const placePin = (coords, zoom) => {
     setProperty(null);
+    setPropertyB(null);
     setPin(coords);
     setView({ center: coords, zoom: zoom ?? view.zoom });
   };
@@ -179,31 +211,48 @@ export default function MapWorkstation() {
     toast.success("Location set", { description: label?.split(",").slice(0, 2).join(",") });
   };
 
+  const setOutline = (target, latlngs, zoom) => {
+    if (target === "B") {
+      setPropertyB(latlngs);
+      setView({ center: propertyCentroid(latlngs), zoom: zoom ?? view.zoom });
+    } else applyProperty(latlngs, zoom);
+  };
+
   const propertyTools = {
     property,
+    propertyB,
     drawPoints,
-    onStartDraw: () => {
+    drawTarget,
+    onStartDraw: (target) => {
       setClickPinMode(false);
+      setDrawTarget(target);
       setDrawPoints([]);
     },
     onCancelDraw: () => setDrawPoints(null),
     onFinishDraw: () => {
       if (drawPoints.length < 3) return;
-      applyProperty(drawPoints, view.zoom);
+      setOutline(drawTarget, drawPoints, view.zoom);
       setDrawPoints(null);
-      toast.success("Property outline set", { description: `${drawPoints.length} corners` });
+      toast.success(`Property ${drawTarget === "B" ? "B " : ""}outline set`, { description: `${drawPoints.length} corners` });
     },
-    onOutline: (latlngs) => {
-      applyProperty(latlngs);
-      toast.success("Property outline loaded", { description: `${latlngs.length} vertices` });
+    onOutline: (target, latlngs) => {
+      setOutline(target, latlngs, 16);
+      toast.success(`Property ${target === "B" ? "B " : ""}outline loaded`, { description: `${latlngs.length} vertices` });
     },
-    onClear: () => setProperty(null),
+    onClear: (target) => {
+      if (target === "B") setPropertyB(null);
+      else {
+        setProperty(null);
+        setPropertyB(null);
+      }
+    },
   };
 
   const snapshotState = () => ({
     pin,
     radius,
     property,
+    propertyB,
     basemap,
     zoom: view.zoom,
     visible: ALL_LAYERS.filter((l) => visibility[l.id]).map((l) => l.id),
@@ -211,7 +260,7 @@ export default function MapWorkstation() {
   });
 
   const onShare = async () => {
-    if (!isPro) {
+    if (!pro) {
       setUpgrade({ reason: "Share links are a Pro feature" });
       return;
     }
@@ -234,7 +283,7 @@ export default function MapWorkstation() {
   };
 
   const onPrint = () => {
-    if (!isPro) {
+    if (!pro) {
       setUpgrade({ reason: "PDF property briefs are a Pro feature" });
       return;
     }
@@ -255,11 +304,15 @@ export default function MapWorkstation() {
   };
 
   const layerData = useMemo(() => {
-    if (!proximityData?.categories) return {};
     const out = {};
-    for (const [cat, list] of Object.entries(proximityData.categories)) out[cat] = { features: list };
+    for (const src of [proximityData, dataB]) {
+      for (const [cat, list] of Object.entries(src?.categories || {})) {
+        const seen = new Set((out[cat]?.features || []).map((f) => f.id));
+        out[cat] = { features: [...(out[cat]?.features || []), ...list.filter((f) => !seen.has(f.id))] };
+      }
+    }
     return out;
-  }, [proximityData]);
+  }, [proximityData, dataB]);
 
   const counts = proximityData?.counts || {};
   const focusPoi = (poi) => setView({ center: [poi.lat, poi.lon], zoom: 17 });
@@ -274,8 +327,10 @@ export default function MapWorkstation() {
         onShare={onShare}
         onPrint={onPrint}
         sharing={sharing}
-        isPro={isPro}
+        isPro={pro}
         onUpgrade={() => setUpgrade({ reason: "Unlock GeoPulse Pro" })}
+        onSignIn={() => setAuthOpen(true)}
+        onBranding={() => setBrandingOpen(true)}
       />
       <div className="flex flex-1 min-h-0">
         <LayerSidebar
@@ -301,7 +356,9 @@ export default function MapWorkstation() {
             onMapClick={onMapClick}
             clickPinMode={clickPinMode}
             drawPoints={drawPoints}
+            drawTarget={drawTarget}
             property={property}
+            propertyB={propertyB}
             radius={radius}
             layerData={layerData}
             layerVisibility={visibility}
@@ -331,10 +388,24 @@ export default function MapWorkstation() {
           onFocusPoi={focusPoi}
           env={env}
           propertyTools={propertyTools}
+          compare={{ propertyB, dataB, loadingB }}
         />
       </div>
       <UploadModal open={uploadOpen} onOpenChange={setUploadOpen} onCreated={onCreatedCustom} />
-      <PrintReport open={reportOpen} onClose={() => setReportOpen(false)} pin={pin} radius={radius} property={property} proximityData={proximityData} env={env} />
+      <PrintReport
+        open={reportOpen}
+        onClose={() => setReportOpen(false)}
+        pin={pin}
+        radius={radius}
+        property={property}
+        propertyB={propertyB}
+        proximityData={proximityData}
+        dataB={dataB}
+        env={env}
+        branding={user?.branding}
+      />
+      <AuthDialog open={authOpen} onOpenChange={setAuthOpen} />
+      {brandingOpen && <BrandingDialog open onOpenChange={setBrandingOpen} />}
       <UpgradeDialog
         open={!!upgrade}
         onOpenChange={(v) => !v && setUpgrade(null)}

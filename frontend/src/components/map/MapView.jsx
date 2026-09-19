@@ -52,15 +52,18 @@ function Recenter({ center, zoom }) {
 }
 
 const PROPERTY_STYLE = { color: "#F59E0B", weight: 2, fillColor: "#F59E0B", fillOpacity: 0.18 };
+const PROPERTY_B_STYLE = { color: "#2DD4BF", weight: 2, fillColor: "#2DD4BF", fillOpacity: 0.18 };
 const BUFFER_STYLE = { color: "#38BDF8", weight: 1.5, fillColor: "#38BDF8", fillOpacity: 0.08, dashArray: "4 6" };
+const BUFFER_B_STYLE = { color: "#2DD4BF", weight: 1.5, fillColor: "#2DD4BF", fillOpacity: 0.06, dashArray: "4 6" };
 
-export function BufferOverlay({ pin, radius, property }) {
+export function BufferOverlay({ pin, radius, property, variant = "A" }) {
   const buffer = useMemo(() => (property ? propertyBuffer(property, radius) : null), [property, radius]);
+  const isB = variant === "B";
   if (property) {
     return (
       <>
-        <GeoJSON key={`${radius}-${property.length}-${property[0]}`} data={buffer} style={BUFFER_STYLE} />
-        <Polygon positions={property} pathOptions={PROPERTY_STYLE} />
+        <GeoJSON key={`${variant}-${radius}-${property.length}-${property[0]}`} data={buffer} style={isB ? BUFFER_B_STYLE : BUFFER_STYLE} />
+        <Polygon positions={property} pathOptions={isB ? PROPERTY_B_STYLE : PROPERTY_STYLE} />
       </>
     );
   }
@@ -74,7 +77,9 @@ export default function MapView({
   onMapClick,
   clickPinMode,
   drawPoints,
+  drawTarget,
   property,
+  propertyB,
   radius,
   layerData, // { [layerId]: { features: [...] } }
   layerVisibility,
@@ -94,6 +99,7 @@ export default function MapView({
 
   const pinIcon = useMemo(() => makePinIcon(), []);
   const drawing = Array.isArray(drawPoints);
+  const drawColor = drawTarget === "B" ? "#2DD4BF" : "#F59E0B";
 
   return (
     <MapContainer
@@ -121,12 +127,13 @@ export default function MapView({
 
       {pin && <Marker position={pin} icon={pinIcon} />}
       <BufferOverlay pin={pin} radius={radius} property={property} />
+      {propertyB && <BufferOverlay radius={radius} property={propertyB} variant="B" />}
 
       {drawing && drawPoints.length > 0 && (
         <>
-          <Polyline positions={drawPoints.length > 2 ? [...drawPoints, drawPoints[0]] : drawPoints} pathOptions={{ color: "#F59E0B", weight: 2, dashArray: "6 4" }} />
+          <Polyline positions={drawPoints.length > 2 ? [...drawPoints, drawPoints[0]] : drawPoints} pathOptions={{ color: drawColor, weight: 2, dashArray: "6 4" }} />
           {drawPoints.map((p, i) => (
-            <CircleMarker key={i} center={p} radius={5} pathOptions={{ color: "#0b0f17", fillColor: "#F59E0B", fillOpacity: 1, weight: 1.5 }} />
+            <CircleMarker key={i} center={p} radius={5} pathOptions={{ color: "#0b0f17", fillColor: drawColor, fillOpacity: 1, weight: 1.5 }} />
           ))}
         </>
       )}

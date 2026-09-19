@@ -4,7 +4,48 @@ import { queryPOIs, geocodeClient } from "@/lib/overpass";
 const BACKEND_URL = process.env.REACT_APP_BACKEND_URL;
 export const API = `${BACKEND_URL}/api`;
 
-export const api = axios.create({ baseURL: API, timeout: 40000 });
+export const api = axios.create({ baseURL: API, timeout: 40000, withCredentials: true });
+
+// Silent access-token refresh on 401 (once per request)
+api.interceptors.response.use(undefined, async (error) => {
+  const cfg = error.config || {};
+  const url = cfg.url || "";
+  if (error.response?.status === 401 && !cfg._retried && !url.startsWith("/auth/")) {
+    cfg._retried = true;
+    try {
+      await axios.post(`${API}/auth/refresh`, null, { withCredentials: true });
+      return api(cfg);
+    } catch {
+      /* fall through */
+    }
+  }
+  return Promise.reject(error);
+});
+
+export function formatApiError(detail, fallback = "Something went wrong") {
+  if (detail == null) return fallback;
+  if (typeof detail === "string") return detail;
+  if (Array.isArray(detail)) return detail.map((e) => (typeof e?.msg === "string" ? e.msg : JSON.stringify(e))).join(" ");
+  if (typeof detail?.msg === "string") return detail.msg;
+  return String(detail);
+}
+
+export const authApi = {
+  me: () => api.get("/auth/me").then((r) => r.data),
+  refresh: () => api.post("/auth/refresh").then((r) => r.data),
+  login: (email, password) => api.post("/auth/login", { email, password }).then((r) => r.data),
+  register: (email, password, name) => api.post("/auth/register", { email, password, name }).then((r) => r.data),
+  logout: () => api.post("/auth/logout").then((r) => r.data),
+  claimLicense: (session_id) => api.post("/auth/claim-license", { session_id }).then((r) => r.data),
+  updateBranding: (branding) => api.put("/auth/branding", branding).then((r) => r.data),
+  uploadLogo: (file) => {
+    const fd = new FormData();
+    fd.append("file", file);
+    return api.post("/auth/branding/logo", fd).then((r) => r.data);
+  },
+  deleteLogo: () => api.delete("/auth/branding/logo").then((r) => r.data),
+  logoUrl: (version) => `${API}/auth/branding/logo?v=${version || ""}`,
+};
 
 export async function geocode(q) {
   // Try backend proxy first (adds User-Agent, avoids browser 429 headers), fall
