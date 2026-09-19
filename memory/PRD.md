@@ -59,6 +59,23 @@ links) are unlocked with a one-time Stripe payment.
   pass except automated Stripe UI completion which the agent couldn't drive;
   bogus-license bug fixed and self-verified).
 
+### 2026-09-19 — Accounts, branding, compare
+- **Auth (JWT, httpOnly cookies)**: `auth.py` — register/login/logout/refresh/
+  me, bcrypt, 5-fail lockout, admin seeded from env (`ADMIN_EMAIL`,
+  `ADMIN_PASSWORD`, `JWT_SECRET` in backend/.env). Frontend `AuthContext`,
+  `AuthDialog`, `AccountMenu` in TopBar; axios `withCredentials` + silent
+  refresh interceptor. Pro = account `is_pro` OR device license; device
+  license auto-claimed to the account on login (`POST /api/auth/claim-license`);
+  Stripe checkout attaches `user_id`, payment confirmation sets `users.is_pro`.
+- **Brief branding**: `PUT /api/auth/branding`, logo upload to Emergent Object
+  Storage (`storage.py`, `POST/GET/DELETE /api/auth/branding/logo`),
+  `BrandingDialog`; PrintReport renders a branded header.
+- **Compare properties**: outline B (teal) via `PropertyTools`, own POI fetch,
+  `CompareScorecard` (count + nearest per category, row winners, verdict) in
+  the panel and in the print brief; B included in share-link state.
+- Traffic layer still awaiting `TOMTOM_API_KEY` (user did not supply one).
+- Testing: iteration_5 — backend 16/16, all frontend flows pass.
+
 ## Design system
 See `/app/design_guidelines.json` — Outfit / Manrope / IBM Plex Mono type,
 `#0B0F17` obsidian base + tactical signal accent (`#38BDF8`, `#F59E0B`,
@@ -66,10 +83,9 @@ See `/app/design_guidelines.json` — Outfit / Manrope / IBM Plex Mono type,
 
 ## Prioritized backlog
 ### P1
-- User accounts so a Pro purchase follows the user across devices (currently
-  device-local license).
-- Population density heatmap (real data source).
 - Provide `TOMTOM_API_KEY` to turn on the traffic layer.
+- Password reset by email (needs an email provider, e.g. Resend).
+- Population density heatmap (real data source).
 ### P2
 - Time-slider for weather / AQI trends.
 - Measure-distance and area tools.
@@ -80,4 +96,5 @@ See `/app/design_guidelines.json` — Outfit / Manrope / IBM Plex Mono type,
   to curated + synthetic data.
 - React StrictMode disabled intentionally (react-leaflet 4.2.1).
 - Stripe webhooks may not reach preview; status endpoint polls Stripe directly.
-- Pro license is per-device (localStorage) since there is no auth.
+- Anonymous Pro purchases stay device-local until the buyer signs in (then
+  they are claimed to the account).

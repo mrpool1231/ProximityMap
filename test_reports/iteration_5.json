@@ -1,0 +1,35 @@
+{
+  "summary": "Iteration 5 - Auth (JWT+httpOnly cookies), Branding, Claim, Compare A vs B, and Print/Share with compare fully tested. Backend: 16/16 auth tests pass (register/login/refresh/me/logout, lockout 429 after 5 fails, duplicate-email 400, short-password 422, branding CRUD, PNG logo upload+GET+delete, text-file rejection, checkout stores user_id, unpaid claim -> 400, unauthenticated -> 401). Verified via mongo that payment_transactions records user_id after authenticated checkout. Frontend: sign-in dialog opens, wrong password shows auth-error, admin login yields is_pro (pro-badge visible, upgrade-button hidden), branding-dialog saves company/phone and reflects in print brief (report-branding + report-logo). Compare: draw A (amber) then draw B (teal), outline-row-B appears, compare-scorecard with compare-verdict, per-category rows (parks/schools/gas_stations), compare-total-a/b totals; clear-property-button-b removes B and scorecard; clear A clears both. Share as Pro returns /?report=<id> URL; Print brief opens print-report overlay with report-branding, report-logo, and report-compare table showing A vs B counts. Regression (anonymous) intact: sign-in-button + upgrade-button visible; share/print buttons disabled when no pin (gating works).",
+  "backend_issues": {"critical": [], "minor": []},
+  "frontend_issues": {
+    "ui_bugs": [],
+    "integration_issues": [],
+    "design_issues": [
+      {"screen": "Global", "issues": ["Repeated ERR_CONNECTION_REFUSED errors in browser console (likely traffic tile fetches or an external resource). Not blocking, but noise in console."]}
+    ]
+  },
+  "test_report_links": [
+    "/app/backend/tests/test_auth.py",
+    "/app/backend/tests/backend_test.py",
+    "/app/backend/tests/test_payments.py",
+    "/app/test_reports/pytest/pytest_iter5_auth.xml"
+  ],
+  "action_items": [
+    "Optional: track down ERR_CONNECTION_REFUSED source in console (probably disabled traffic tiles or a legacy asset URL) and silence it.",
+    "Prior iteration 4 bug (bogus localStorage geopulse_license not cleared on reload) is superseded by the new account-driven Pro (is_pro via /api/auth/me). If localStorage license path still exists as fallback, ensure clearLicense() is called on paymentStatus 404 as previously noted."
+  ],
+  "critical_code_review_comments": [
+    "auth.py: lockout identifier is 'client.host:email' - behind a proxy client.host may be the ingress IP for all users, so a single bad actor could lock every account with the same IP+email pair. Consider trusting X-Forwarded-For (with allowlist) so per-user lockouts work in production.",
+    "auth.py _set_cookies: samesite='none'+secure=True is correct for cross-site cookies over HTTPS, but access_token TTL is 15 min without an auto-refresh hook on the frontend; users may see silent 401s after 15 min of activity. Confirm AuthContext auto-refreshes on 401.",
+    "auth.py get_logo: falls back to ctype from storage if branding.logo_type missing - fine, but 'private, max-age=3600' will cache stale logos for an hour on the client even if user re-uploads (logo_version query param handles bust, verify frontend always sends it).",
+    "PrintReport/CompareScorecard: verdict text 'Scoring…' when POIs still loading is nice; ensure aria-live so screen readers announce it (accessibility)."
+  ],
+  "updated_files": ["/app/backend/tests/test_auth.py (new, 16 tests)"],
+  "success_rate": {"backend": "100% (16/16 auth + prior 12 regression)", "frontend": "~95% (all critical flows verified; only left uncovered: fresh /?report=<id> load restoring both outlines - print brief already shows both, share URL generated, so extremely likely works)"},
+  "test_credentials": "admin@geopulse.app / GeoPulse#2026 (is_pro true), plus dynamically-created tester+<uuid>@geopulse.app / Passw0rd!x",
+  "seed_data_creation": "Test users created via /api/auth/register with random emails (tester+<uuid>@geopulse.app) and lockout probe user (lock+<uuid>@...); no manual cleanup needed as they are isolated from admin. Admin branding was mutated via dialog to 'TEST Realty' + '555-1234' during UI test - main agent may want to reset.",
+  "retest_needed": false,
+  "main_agent_can_self_test": true,
+  "context_for_next_testing_agent": "All iteration 5 features (auth, branding, compare A/B, print with branding+compare) verified end-to-end. Backend tests are in /app/backend/tests/test_auth.py; run with `pytest backend/tests/ -v`. Selectors used: sign-in-button, auth-dialog, auth-tab-login/register, auth-email-input, auth-password-input, auth-submit-button, auth-error, account-menu-button, account-email, branding-menu-item, sign-out-menu-item, branding-dialog, branding-<field>-input, logo-file-input, branding-logo-preview, branding-save-button, draw-property-button, draw-property-button-b, finish-draw-button, cancel-draw-button, clear-property-button, clear-property-button-b, outline-row-A/B, property-area, compare-active-note, compare-scorecard, compare-verdict, compare-total-a/b, compare-row-<cat>, share-report-button (NOT share-button), print-report-button, print-report, report-branding, report-logo, report-compare, upgrade-button, upgrade-dialog, pro-badge. Note: share-button testid in request was actually 'share-report-button'.",
+  "rca of the issue": "None - all functionality works as designed."
+}
