@@ -76,6 +76,18 @@ links) are unlocked with a one-time Stripe payment.
 - Traffic layer still awaiting `TOMTOM_API_KEY` (user did not supply one).
 - Testing: iteration_5 — backend 16/16, all frontend flows pass.
 
+### 2026-09-19 — ChatGPT integration
+- `ai.py` (OpenAI **gpt-5.4** via emergentintegrations + `EMERGENT_LLM_KEY`):
+  `POST /api/ai/chat` (SSE streaming, multi-turn; history in Mongo
+  `ai_messages` keyed by `session_id`, replayed into the system prompt),
+  `GET/DELETE /api/ai/history/{session}`, `POST /api/ai/summary` (one-shot
+  streamed brief narrative), `GET /api/ai/config`.
+- Frontend: `AIAnalyst` floating chat over the map (context = pin/radius/
+  counts/nearest/env/A-vs-B via `lib/ai.js buildAIContext`), 3 free questions
+  for anonymous users then paywall, unlimited for Pro. `AISummary` section in
+  the print brief ("Generate with ChatGPT").
+- Testing: iteration_6 — backend 8/8, all frontend flows pass.
+
 ## Design system
 See `/app/design_guidelines.json` — Outfit / Manrope / IBM Plex Mono type,
 `#0B0F17` obsidian base + tactical signal accent (`#38BDF8`, `#F59E0B`,

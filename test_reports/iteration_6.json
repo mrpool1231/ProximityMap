@@ -1,0 +1,30 @@
+{
+  "summary": "Iteration 6 - ChatGPT (gpt-5.4 via emergentintegrations, EMERGENT_LLM_KEY) integration end-to-end verified. Backend: 8/8 pytest cases pass in /app/backend/tests/test_ai.py — GET /api/ai/config returns {enabled:true, provider:'openai', model:'gpt-5.4'}; POST /api/ai/chat streams SSE 'data: {delta}' lines ending with a 'done' event and persists both user+assistant rows in Mongo ai_messages; GET /api/ai/history returns them in order; follow-up 'Which is closest?' answer references 'Hudson River Park' proving multi-turn context; DELETE /api/ai/history returns deleted>=2 and clears history; validation returns 422 for empty message and short session_id; POST /api/ai/summary returns 400 when context.pin missing and streams a multi-paragraph summary (>100 chars) when context valid. Frontend anonymous: cleared localStorage, dropped pin (drop-pin-button + click on leaflet-container off-center), opened ai-panel (header 'ChatGPT · 3 free left'), ai-input enabled once pin set, clicked ai-suggestion chip → ai-message-user + streaming ai-message-assistant (len=327 in 2s), header decremented to '2 free left' and localStorage geopulse_ai_free_used=1. Reload + reopen panel restores 1 user + 1 assistant message from history (history-fetch race is fixed — messages persist). Setting geopulse_ai_free_used=3, drop pin, open panel shows '0 free left'; 4th send opens upgrade-dialog with text mentioning 'free AI questions'. ai-clear-button empties the conversation, ai-close-button hides the panel. Frontend Pro: admin login (admin@geopulse.app), drop pin, open ai-panel shows 'ChatGPT · unlimited'; print-report-button opens print-report with ai-summary-section, ai-summary-button labelled 'Generate with ChatGPT'; clicking streams into ai-summary-text and the button relabels to 'Regenerate'. Regression: Leaflet map/pin drop/attribution/POI fetch continue to work with the AI FAB present.",
+  "backend_issues": {"critical": [], "minor": []},
+  "frontend_issues": {
+    "ui_bugs": [],
+    "integration_issues": [],
+    "design_issues": [
+      {"screen": "Global console", "issues": ["Repeated net::ERR_CONNECTION_REFUSED and one 401 in the browser console — same pre-existing noise flagged in iteration 5 (traffic tiles disabled, unauthenticated /api/auth/me on landing). Not blocking."]}
+    ]
+  },
+  "test_report_links": [
+    "/app/backend/tests/test_ai.py",
+    "/app/test_reports/pytest/pytest_iter6_ai.xml"
+  ],
+  "action_items": [],
+  "critical_code_review_comments": [
+    "ai.py _stream: on mid-stream provider failure the 'done' event is not emitted (only the error frame + return). The frontend streamAI() therefore raises after processing the error frame — good — but the user's message was ALREADY written to ai_messages before streaming started, so failed turns leave an orphan user row in history with no assistant reply. Consider deferring the user insert until first delta arrives, or persisting a placeholder assistant row on error, so the reconstructed conversation isn't lopsided.",
+    "ai.py history is fetched BEFORE the current user message is inserted (line 95 then 98) — correct ordering. However _history_block includes up to HISTORY_TURNS*2 = 24 rows without token budgeting; long sessions will steadily grow the system prompt. Consider capping by char length or summarising older turns.",
+    "AIAnalyst.jsx line 24: setMessages((prev) => (prev.length ? prev : r.data.messages)) guards against the history-fetch-vs-stream race (this is the fix mentioned in the request) — verified working after reload. Minor: the effect re-runs on 'open' toggle, so closing+reopening the panel mid-conversation refetches history but preserves current messages; that's the intended behaviour.",
+    "ai.js streamAI throws on msg.error, but the surrounding component then does setMessages((m) => m.slice(0, -1)) which drops only the placeholder assistant, leaving the user message visible with no reply. Consider also popping the user bubble or showing an inline error state so users understand the turn failed."
+  ],
+  "updated_files": ["/app/backend/tests/test_ai.py (new, 8 tests)"],
+  "success_rate": {"backend": "100% (8/8 AI + prior iter5 auth/branding/payments unchanged)", "frontend": "100% of AI-panel and AI-summary flows verified"},
+  "test_credentials": "admin@geopulse.app / GeoPulse#2026 (is_pro true)",
+  "seed_data_creation": "Chat history rows created under session ids qa-<uuid> and cleaned up in-test via DELETE /api/ai/history. One admin AI conversation created during UI test remains in ai_messages under the browser-generated ai-<uuid> session — not tied to the account and harmless.",
+  "retest_needed": false,
+  "main_agent_can_self_test": true,
+  "context_for_next_testing_agent": "Selectors used for AI: ai-open-button, ai-panel, ai-input, ai-send-button, ai-suggestion, ai-message-user, ai-message-assistant, ai-messages, ai-clear-button, ai-close-button, ai-summary-section, ai-summary-button, ai-summary-text, upgrade-dialog. localStorage keys: geopulse_ai_free_used (0..3), geopulse_ai_session (ai-<uuid>). Free counter increments only on successful stream (bumpFreeUsed inside the try). Pin-drop pattern: click drop-pin-button then page.mouse.click at (center-150, center+120) on .leaflet-container to avoid the existing NYC landmark markers. Print brief opens as an overlay (id=print-report) even for admin; the AI summary section only renders inside that overlay. Backend AI tests are in /app/backend/tests/test_ai.py — run with `pytest backend/tests/test_ai.py -v -o addopts=''` (the repo pytest.ini enables xdist which parallelises across two workers and works fine; the -o override was only used ad hoc).",
+  "rca of the issue": "N/A — the previously reported history-fetch race that wiped messages is fixed. AIAnalyst.jsx uses `setMessages(prev => prev.length ? prev : r.data.messages)` inside the open-effect, so the async /api/ai/history response can no longer overwrite an in-progress or just-streamed conversation. Verified by reloading after a streamed answer and confirming both bubbles reappeared."
+}
