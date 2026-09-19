@@ -7,6 +7,7 @@ import { LAYER_BY_ID } from "@/lib/mapConfig";
 import { propertyBuffer, bufferBounds } from "@/lib/geo";
 import { BufferOverlay } from "@/components/map/MapView";
 import { authApi } from "@/lib/api";
+import AISummary from "@/components/map/AISummary";
 
 const fmtDist = (m) => (m < 1000 ? `${Math.round(m)} m` : `${(m / 1000).toFixed(2)} km`);
 
@@ -22,7 +23,7 @@ function Stat({ label, value, unit }) {
   );
 }
 
-export default function PrintReport({ open, onClose, pin, radius, property, propertyB, proximityData, dataB, env, branding }) {
+export default function PrintReport({ open, onClose, pin, radius, property, propertyB, proximityData, dataB, env, branding, aiContext }) {
   if (!open || !pin) return null;
   const bufferA = property ? propertyBuffer(property, radius) : null;
   let bounds = bufferA ? bufferBounds(bufferA) : L.latLng(pin).toBounds(radius * 2.3);
@@ -133,6 +134,8 @@ export default function PrintReport({ open, onClose, pin, radius, property, prop
           <Stat label="US AQI" value={a?.us_aqi} />
           <Stat label="Elevation" value={elev != null ? Math.round(elev) : null} unit="m" />
         </section>
+
+        <AISummary context={aiContext} />
 
         <section className="mb-4 flex items-baseline justify-between">
           <h2 className="font-heading text-lg font-semibold">Nearby amenities</h2>

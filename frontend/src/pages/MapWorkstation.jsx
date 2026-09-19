@@ -9,6 +9,8 @@ import PrintReport from "@/components/map/PrintReport";
 import UpgradeDialog from "@/components/map/UpgradeDialog";
 import AuthDialog from "@/components/map/AuthDialog";
 import BrandingDialog from "@/components/map/BrandingDialog";
+import AIAnalyst from "@/components/map/AIAnalyst";
+import { buildAIContext } from "@/lib/ai";
 import { useAuth } from "@/context/AuthContext";
 import { DEFAULT_CENTER, DEFAULT_ZOOM, POI_LAYERS, ENV_LAYERS, CONCEPT_LAYERS } from "@/lib/mapConfig";
 import {
@@ -317,6 +319,10 @@ export default function MapWorkstation() {
   const counts = proximityData?.counts || {};
   const focusPoi = (poi) => setView({ center: [poi.lat, poi.lon], zoom: 17 });
   const capturing = clickPinMode || Array.isArray(drawPoints);
+  const aiContext = useMemo(
+    () => buildAIContext({ pin, radius, property, propertyB, proximityData, dataB, env }),
+    [pin, radius, property, propertyB, proximityData, dataB, env]
+  );
 
   return (
     <div className="flex h-screen w-screen flex-col overflow-hidden bg-[#0b0f17]">
@@ -368,6 +374,7 @@ export default function MapWorkstation() {
             trafficTileUrl={trafficCfg.enabled ? TRAFFIC_TILE_URL : null}
           />
           <Legend visibility={visibility} counts={counts} customLayers={customLayers} />
+          <AIAnalyst context={aiContext} pro={pro} onUpgrade={(reason) => setUpgrade({ reason })} />
           {capturing && (
             <div className="pointer-events-none absolute left-1/2 top-4 z-30 -translate-x-1/2 rounded-full border border-amber-400/30 bg-slate-900/90 px-4 py-1.5 backdrop-blur-xl">
               <span className="font-mono text-xs uppercase tracking-widest text-amber-300" data-testid="capture-hint">
@@ -403,6 +410,7 @@ export default function MapWorkstation() {
         dataB={dataB}
         env={env}
         branding={user?.branding}
+        aiContext={aiContext}
       />
       <AuthDialog open={authOpen} onOpenChange={setAuthOpen} />
       {brandingOpen && <BrandingDialog open onOpenChange={setBrandingOpen} />}

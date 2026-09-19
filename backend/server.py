@@ -363,9 +363,11 @@ app.include_router(api_router)
 from payments import payments_router, webhook_router  # noqa: E402
 from auth import auth_router, seed_admin, ensure_indexes  # noqa: E402
 from storage import init_storage  # noqa: E402
+from ai import ai_router  # noqa: E402
 app.include_router(payments_router)
 app.include_router(webhook_router)
 app.include_router(auth_router)
+app.include_router(ai_router)
 
 
 @app.on_event("startup")
