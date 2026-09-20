@@ -32,6 +32,8 @@ export function formatApiError(detail, fallback = "Something went wrong") {
 
 export const authApi = {
   me: () => api.get("/auth/me").then((r) => r.data),
+  forgotPassword: (email) => api.post("/auth/forgot-password", { email }).then((r) => r.data),
+  resetPassword: (token, password) => api.post("/auth/reset-password", { token, password }).then((r) => r.data),
   refresh: () => api.post("/auth/refresh").then((r) => r.data),
   login: (email, password) => api.post("/auth/login", { email, password }).then((r) => r.data),
   register: (email, password, name) => api.post("/auth/register", { email, password, name }).then((r) => r.data),

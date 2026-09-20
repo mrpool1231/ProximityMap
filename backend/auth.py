@@ -1,5 +1,8 @@
 import os
 import uuid
+import secrets
+import hashlib
+from html import escape
 from datetime import datetime, timezone, timedelta
 from typing import Optional
 
@@ -10,6 +13,7 @@ from pydantic import BaseModel, EmailStr, Field
 
 from core import db
 from storage import put_object, get_object, APP_NAME
+from emailer import send_email, EMAIL_FROM_NAME
 
 JWT_ALGORITHM = "HS256"
 ACCESS_TTL = timedelta(minutes=15)
@@ -122,6 +126,36 @@ class ClaimIn(BaseModel):
     session_id: str
 
 
+class ForgotIn(BaseModel):
+    email: EmailStr
+
+
+class ResetIn(BaseModel):
+    token: str = Field(min_length=20, max_length=200)
+    password: str = Field(min_length=8, max_length=128)
+
+
+RESET_TTL = timedelta(hours=1)
+RESET_MAX_PER_HOUR = 3
+
+
+def _reset_email_html(name: str, link: str) -> str:
+    n, l, brand = escape(name), escape(link, quote=True), escape(EMAIL_FROM_NAME)
+    return (
+        '<table role="presentation" width="100%" style="background:#0b0f17;padding:32px 0"><tr><td align="center">'
+        '<table role="presentation" width="520" style="background:#111827;border-radius:12px;padding:32px;font-family:Arial,sans-serif;color:#e2e8f0">'
+        f'<tr><td><p style="margin:0 0 8px;font-size:12px;letter-spacing:2px;color:#94a3b8">{brand}</p>'
+        f'<h1 style="margin:0 0 16px;font-size:22px;color:#f8fafc">Reset your password</h1>'
+        f'<p style="margin:0 0 20px;line-height:1.6">Hi {n}, we received a request to reset the password for your {brand} account. '
+        'This link works once and expires in 1 hour.</p>'
+        f'<p style="margin:0 0 24px"><a href="{l}" style="display:inline-block;background:#38bdf8;color:#0b0f17;font-weight:bold;'
+        'padding:12px 20px;border-radius:8px;text-decoration:none">Choose a new password</a></p>'
+        '<p style="margin:0 0 8px;font-size:13px;color:#94a3b8">If you did not request this, you can ignore this email — your password will not change.</p>'
+        f'<p style="margin:16px 0 0;font-size:12px;color:#64748b">Sent by {brand}. We never ask for your password or payment details by email.</p>'
+        '</td></tr></table></td></tr></table>'
+    )
+
+
 async def _lockout_check(identifier: str):
     row = await db.login_attempts.find_one({"identifier": identifier})
     if row and row.get("count", 0) >= MAX_ATTEMPTS and row.get("last_attempt") and _now() - row["last_attempt"].replace(tzinfo=timezone.utc) < LOCKOUT:
@@ -204,6 +238,48 @@ async def claim_license(payload: ClaimIn, user: dict = Depends(get_current_user)
     return {"is_pro": True}
 
 
+@auth_router.post("/forgot-password")
+async def forgot_password(payload: ForgotIn, request: Request):
+    email = payload.email.lower()
+    generic = {"ok": True, "message": "If an account exists for that email, a reset link is on its way."}
+    user = await db.users.find_one({"email": email}, {"_id": 0})
+    if not user:
+        return generic
+    since = _now() - timedelta(hours=1)
+    recent = await db.password_reset_tokens.count_documents({"user_id": user["id"], "created_at": {"$gte": since}})
+    if recent >= RESET_MAX_PER_HOUR:
+        return generic
+    token = secrets.token_urlsafe(32)
+    await db.password_reset_tokens.insert_one({
+        "token_hash": hashlib.sha256(token.encode()).hexdigest(),
+        "user_id": user["id"],
+        "used": False,
+        "created_at": _now(),
+        "expires_at": _now() + RESET_TTL,
+    })
+    origin = request.headers.get("origin") or f"{request.url.scheme}://{request.url.netloc}"
+    if not origin.startswith("https://"):
+        origin = "https://" + origin.split("://", 1)[-1]
+    link = f"{origin}/reset-password?token={token}"
+    await send_email(to=user["email"], subject=f"Reset your {EMAIL_FROM_NAME} password", html=_reset_email_html(user.get("name") or "there", link))
+    return generic
+
+
+@auth_router.post("/reset-password")
+async def reset_password(payload: ResetIn, response: Response):
+    row = await db.password_reset_tokens.find_one({"token_hash": hashlib.sha256(payload.token.encode()).hexdigest()})
+    if not row or row.get("used") or row["expires_at"].replace(tzinfo=timezone.utc) < _now():
+        raise HTTPException(400, "This reset link is invalid or has expired. Request a new one.")
+    user = await db.users.find_one({"id": row["user_id"]}, {"_id": 0})
+    if not user:
+        raise HTTPException(400, "Account no longer exists")
+    await db.users.update_one({"id": user["id"]}, {"$set": {"password_hash": hash_password(payload.password)}})
+    await db.password_reset_tokens.update_one({"_id": row["_id"]}, {"$set": {"used": True}})
+    await db.login_attempts.delete_many({"identifier": {"$regex": f":{user['email']}$"}})
+    _set_cookies(response, user["id"], user["email"])
+    return public_user(user)
+
+
 @auth_router.put("/branding")
 async def update_branding(payload: BrandingIn, user: dict = Depends(get_current_user)):
     branding = {**(user.get("branding") or {}), **payload.model_dump()}
@@ -264,3 +340,5 @@ async def ensure_indexes():
     await db.users.create_index("email", unique=True)
     await db.users.create_index("id", unique=True)
     await db.login_attempts.create_index("identifier")
+    await db.password_reset_tokens.create_index("expires_at", expireAfterSeconds=0)
+    await db.password_reset_tokens.create_index("token_hash")

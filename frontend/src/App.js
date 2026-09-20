@@ -5,6 +5,7 @@ import MapWorkstation from "@/pages/MapWorkstation";
 import PaymentSuccess from "@/pages/PaymentSuccess";
 import PaymentCancel from "@/pages/PaymentCancel";
 import LegalPage from "@/pages/LegalPage";
+import ResetPassword from "@/pages/ResetPassword";
 import { AuthProvider } from "@/context/AuthContext";
 
 function App() {
@@ -18,6 +19,7 @@ function App() {
             <Route path="/payment/cancel" element={<PaymentCancel />} />
             <Route path="/legal/:page" element={<LegalPage />} />
             <Route path="/legal" element={<LegalPage />} />
+            <Route path="/reset-password" element={<ResetPassword />} />
           </Routes>
         </BrowserRouter>
       </AuthProvider>
