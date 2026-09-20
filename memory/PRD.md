@@ -100,6 +100,14 @@ links) are unlocked with a one-time Stripe payment.
 - Testing: iteration_7 — pass (one edge case fixed afterwards: way centroid
   just beyond radius now filtered).
 
+### 2026-09-20 — Launch prep (items 1–6)
+- TomTom basemaps (night/main/sat+hybrid) proxied via `/api/basemap/{style}/{z}/{x}/{y}`;
+  OSM/Esri tile servers no longer used. Geocoding → TomTom Search with Nominatim fallback.
+- Admin credentials rotated (admin@mapapp.app, see test_credentials.md); old admin deleted.
+- Legal pages `/legal/terms|privacy|refunds` (LegalPage.jsx) linked from TopBar, Upgrade & Auth dialogs.
+- Deployment agent check: pass. Stripe account claim (KYC) is a user action.
+- Testing: iteration_8 — backend 11/11, frontend all pass.
+
 ## Design system
 See `/app/design_guidelines.json` — Outfit / Manrope / IBM Plex Mono type,
 `#0B0F17` obsidian base + tactical signal accent (`#38BDF8`, `#F59E0B`,

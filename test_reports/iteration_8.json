@@ -1,0 +1,27 @@
+{
+  "summary": "Iteration 8 — MapApp launch prep verification (TomTom basemap proxy, TomTom geocode, admin rotation, legal pages). Backend pytest /app/backend/tests/test_basemap_geocode.py — 11/11 PASSED in 2.85s: (a) /api/basemap/config returns provider 'tomtom'; (b) /api/basemap/night/14/4824/6156 → 200 image/png; (c) /api/basemap/sat/14/4824/6156 → 200 image/jpeg; (d) /api/basemap/hybrid & /main → 200 image/*; (e) /api/basemap/osm/14/4824/6156 → 400 (invalid style); (f) /api/basemap/night/3/100/100 → 400 (out of range for z=3); (g) /api/geocode?q=Empire State Building → provider='tomtom', first display_name contains 'Empire State Building', lat≈40.748, lon≈-73.985; (h) /api/geocode?q=10 Downing Street London → first result lat≈51.50; (i) login admin@mapapp.app / Ma-XjKTb93osTQxQhe1wD → 200 is_pro=true; (j) login admin@geopulse.app / GeoPulse#2026 → 401 (old admin removed). Frontend Playwright: (1) MapView loads with 16 tile <img> under /api/basemap/night/*; zero OSM/arcgis tile URLs. Attribution reads 'Leaflet | © TomTom'. (2) basemap-selector opens options ['dark','positron','satellite']; selecting satellite switches srcs to /api/basemap/sat/*, selecting positron switches to /api/basemap/main/*. (3) Proximity search 'Empire State Building' returns typeahead list — first entry '350 5th Avenue, New York, NY 10001'; clicking it drops pin at 40.74817,-73.98498 (TopBar 'FOCUS 40.7482, -73.9850'). Analysis center right panel shows 116 POIs. (4) Legal: TopBar data-testid=legal-link → /legal/terms with legal-title 'Terms of Service'; legal-nav-privacy → 'Privacy Policy'; legal-nav-refunds → 'Refund Policy'; /legal/unknown redirects to /legal/terms; legal-back-link returns to '/'. (5) UpgradeDialog (data-testid=upgrade-button/Go Pro) renders both upgrade-terms-link and upgrade-refunds-link. AuthDialog renders legal-link (single combined link). (6) Regression: drop-pin + POIs — real OSM names (Greeley Square Park, Herald Square, Unnamed park), 116 total, poi-source text 'Live OpenStreetMap data · straight-line distances'; print brief button visible for signed-in admin (Go Pro state), TomTom light basemap active behind it.",
+  "backend_issues": {"critical": [], "minor": []},
+  "frontend_issues": {
+    "ui_bugs": [],
+    "integration_issues": [],
+    "design_issues": []
+  },
+  "test_report_links": [
+    "/app/backend/tests/test_basemap_geocode.py",
+    "/app/test_reports/pytest/pytest_iter8.xml"
+  ],
+  "action_items": [],
+  "critical_code_review_comments": [
+    "server.py basemap_tile: upstream 5xx is masked as 502 with generic message; consider logging the upstream status/body once on error to speed debugging when TomTom quota flips.",
+    "server.py basemap_tile sets Cache-Control public,max-age=86400 even on transient upstream errors path? No — only 200 branch caches; OK.",
+    "geocode: TomTom fallback to Nominatim is silent — expose provider even in error responses (currently 502 raise gives no provider hint). Nice-to-have."
+  ],
+  "updated_files": ["/app/backend/tests/test_basemap_geocode.py (new, 11 tests)"],
+  "success_rate": {"backend": "11/11 (100%)", "frontend": "100% — all 6 flows verified"},
+  "test_credentials": "admin@mapapp.app / Ma-XjKTb93osTQxQhe1wD (from /app/memory/test_credentials.md). Old admin@geopulse.app confirmed removed (401).",
+  "seed_data_creation": "None",
+  "retest_needed": false,
+  "main_agent_can_self_test": true,
+  "context_for_next_testing_agent": "TomTom launch prep verified end-to-end. Backend basemap proxy styles: night/main/sat/hybrid (any other → 400). Geocode always reports provider='tomtom' when TOMTOM_API_KEY set. Frontend basemap options: dark→night, positron→main, satellite→sat. Legal routes /legal/terms|privacy|refunds with legal-back-link back to '/'; unknown legal path redirects to /legal/terms. UpgradeDialog has upgrade-terms-link + upgrade-refunds-link; AuthDialog uses a single legal-link. No regressions on POI drop-pin flow.",
+  "rca of the issue": "N/A — all launch-prep changes verified working."
+}
