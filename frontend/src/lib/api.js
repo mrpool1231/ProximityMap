@@ -1,5 +1,5 @@
 import axios from "axios";
-import { queryPOIs, geocodeClient } from "@/lib/overpass";
+import { queryCategory, geocodeClient } from "@/lib/overpass";
 
 const BACKEND_URL = process.env.REACT_APP_BACKEND_URL;
 export const API = `${BACKEND_URL}/api`;
@@ -60,10 +60,30 @@ export async function geocode(q) {
 }
 
 export async function fetchPOIs({ lat, lon, radius, categories }) {
-  // Overpass calls happen directly from the browser to avoid the server IP
-  // being rate-limited / blocked. Backend has a /api/pois fallback but it is
-  // unreliable from this network environment.
-  return queryPOIs({ lat, lon, radius, categories });
+  // Browser-side Overpass and the backend proxy are raced per category; both
+  // return the same live OpenStreetMap data, whichever answers first wins.
+  // Categories neither source could fetch are reported as unavailable — never
+  // substituted with fake data.
+  const backend = api
+    .get("/pois", { params: { lat, lon, radius, categories: categories.join(",") }, timeout: 30000 })
+    .then((r) => r.data)
+    .catch(() => ({ categories: {} }));
+  const settled = await Promise.all(
+    categories.map((c) =>
+      Promise.any([
+        queryCategory({ category: c, lat, lon, radius }).then((r) => r ?? Promise.reject(new Error("browser failed"))),
+        backend.then((d) => d.categories?.[c] ?? Promise.reject(new Error("backend failed"))),
+      ]).catch(() => null)
+    )
+  );
+  const result = { center: { lat, lon }, radius, categories: {}, counts: {}, total: 0, unavailable: [], source: "osm" };
+  categories.forEach((c, i) => {
+    if (settled[i] === null) return result.unavailable.push(c);
+    result.categories[c] = settled[i];
+    result.counts[c] = settled[i].length;
+    result.total += settled[i].length;
+  });
+  return result;
 }
 
 export async function fetchWeather(lat, lon) {

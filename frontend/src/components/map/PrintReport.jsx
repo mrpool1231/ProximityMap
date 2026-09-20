@@ -71,7 +71,7 @@ export default function PrintReport({ open, onClose, pin, radius, property, prop
         <header className="mb-6 flex items-start justify-between border-b-2 border-slate-900 pb-4">
           <div>
             <div className="flex items-center gap-2 text-[11px] font-mono uppercase tracking-[0.2em] text-slate-500">
-              <Compass size={12} /> GeoPulse Studio
+              <Compass size={12} /> MapApp
             </div>
             <h1 className="font-heading text-3xl font-bold tracking-tight" data-testid="report-title">Property Brief</h1>
           </div>

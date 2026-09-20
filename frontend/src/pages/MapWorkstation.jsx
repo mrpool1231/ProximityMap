@@ -58,6 +58,7 @@ export default function MapWorkstation() {
   const [drawTarget, setDrawTarget] = useState("A");
   const [dataB, setDataB] = useState(null);
   const [loadingB, setLoadingB] = useState(false);
+  const [retryTick, setRetryTick] = useState(0);
 
   const [visibility, setVisibility] = useState(initialVisibility);
   const [opacity, setOpacity] = useState(initialOpacity);
@@ -149,13 +150,13 @@ export default function MapWorkstation() {
     const reach = property ? propertyReach(property) : 0;
     fetchPOIs({ lat: pin[0], lon: pin[1], radius: Math.round(radius + reach), categories: activePoiLayers })
       .then((d) => alive && setProximityData(property ? applyPropertyDistances(d, property, radius) : d))
-      .catch(() => alive && toast.error("POI fetch failed"))
+      .catch(() => alive && toast.error("Live place data is unavailable right now"))
       .finally(() => alive && setLoadingPois(false));
     return () => {
       alive = false;
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [pin?.[0], pin?.[1], radius, activePoiLayers.join(","), property]);
+  }, [pin?.[0], pin?.[1], radius, activePoiLayers.join(","), property, retryTick]);
 
   // Property B (comparison) POIs
   useEffect(() => {
@@ -168,13 +169,13 @@ export default function MapWorkstation() {
     const [lat, lon] = propertyCentroid(propertyB);
     fetchPOIs({ lat, lon, radius: Math.round(radius + propertyReach(propertyB)), categories: activePoiLayers })
       .then((d) => alive && setDataB(applyPropertyDistances(d, propertyB, radius)))
-      .catch(() => alive && toast.error("Property B POI fetch failed"))
+      .catch(() => alive && toast.error("Property B: live place data unavailable"))
       .finally(() => alive && setLoadingB(false));
     return () => {
       alive = false;
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [propertyB, radius, activePoiLayers.join(",")]);
+  }, [propertyB, radius, activePoiLayers.join(","), retryTick]);
 
   useEffect(() => {
     if (!pin) return;
@@ -334,7 +335,7 @@ export default function MapWorkstation() {
         onPrint={onPrint}
         sharing={sharing}
         isPro={pro}
-        onUpgrade={() => setUpgrade({ reason: "Unlock GeoPulse Pro" })}
+        onUpgrade={() => setUpgrade({ reason: "Unlock MapApp Pro" })}
         onSignIn={() => setAuthOpen(true)}
         onBranding={() => setBrandingOpen(true)}
       />
@@ -396,6 +397,7 @@ export default function MapWorkstation() {
           env={env}
           propertyTools={propertyTools}
           compare={{ propertyB, dataB, loadingB }}
+          onRetry={() => setRetryTick((t) => t + 1)}
         />
       </div>
       <UploadModal open={uploadOpen} onOpenChange={setUploadOpen} onCreated={onCreatedCustom} />

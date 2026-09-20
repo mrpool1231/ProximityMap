@@ -19,7 +19,7 @@ payments_router = APIRouter(prefix="/api/payments")
 
 PRODUCTS = {
     "geopulse_pro_onetime": {
-        "name": "GeoPulse Pro",
+        "name": "MapApp Pro",
         "tagline": "Property Brief Pass",
         "features": ["Print-ready PDF property briefs", "Shareable report links", "Lifetime access — one-time payment"],
     },

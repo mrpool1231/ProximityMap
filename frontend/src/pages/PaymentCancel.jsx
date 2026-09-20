@@ -7,7 +7,7 @@ export default function PaymentCancel() {
     <div className="flex min-h-screen items-center justify-center bg-[#0b0f17] px-4" data-testid="payment-cancel-page">
       <div className="w-full max-w-md rounded-2xl border border-white/10 bg-slate-900/60 p-8 text-center backdrop-blur-xl">
         <div className="mb-4 flex items-center justify-center gap-2 text-[10px] font-mono uppercase tracking-[0.2em] text-slate-500">
-          <Compass size={12} /> GeoPulse Studio
+          <Compass size={12} /> MapApp
         </div>
         <Undo2 size={36} className="mx-auto mb-4 text-amber-400" />
         <h1 className="font-heading text-xl font-semibold">Checkout cancelled</h1>

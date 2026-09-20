@@ -5,7 +5,7 @@ import { Slider } from "@/components/ui/slider";
 import { Badge } from "@/components/ui/badge";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Separator } from "@/components/ui/separator";
-import { MapPin, Search, Crosshair, Loader2, Target, ChevronRight, CloudRain, Wind, Mountain } from "lucide-react";
+import { MapPin, Search, Crosshair, Loader2, Target, ChevronRight, CloudRain, Wind, Mountain, AlertTriangle } from "lucide-react";
 import { geocode } from "@/lib/api";
 import { LAYER_BY_ID } from "@/lib/mapConfig";
 import PropertyTools from "@/components/map/PropertyTools";
@@ -44,6 +44,7 @@ export default function ProximityPanel({
   env,
   propertyTools,
   compare,
+  onRetry,
 }) {
   const [q, setQ] = useState("");
   const [results, setResults] = useState([]);
@@ -222,8 +223,25 @@ export default function ProximityPanel({
                 </div>
               )}
 
+              {!loading && proximityData?.unavailable?.length > 0 && (
+                <div className="flex items-start gap-2 rounded-lg border border-amber-400/30 bg-amber-400/5 p-3" data-testid="poi-unavailable-banner">
+                  <AlertTriangle size={14} className="mt-0.5 shrink-0 text-amber-300" />
+                  <div className="flex-1 text-xs text-amber-100">
+                    Live OpenStreetMap data unavailable for {proximityData.unavailable.map((c) => LAYER_BY_ID[c]?.label || c).join(", ")}. Nothing was substituted.
+                    <button onClick={onRetry} className="ml-2 font-mono text-[10px] uppercase tracking-widest text-amber-300 underline-offset-2 hover:underline" data-testid="poi-retry-button">
+                      Retry
+                    </button>
+                  </div>
+                </div>
+              )}
+
               {!loading && proximityData?.categories && (
                 <div className="space-y-3">
+                  {proximityData.total > 0 && (
+                    <div className="text-[10px] font-mono uppercase tracking-widest text-slate-500" data-testid="poi-source">
+                      Live OpenStreetMap data · straight-line distances
+                    </div>
+                  )}
                   {Object.entries(proximityData.categories)
                     .filter(([, list]) => list.length > 0)
                     .map(([cat, list]) => {
@@ -260,9 +278,9 @@ export default function ProximityPanel({
                         </div>
                       );
                     })}
-                  {(!proximityData || proximityData.total === 0) && !loading && (
-                    <div className="rounded-lg border border-white/5 bg-slate-900/40 p-3 text-center text-xs text-slate-400">
-                      No POIs in this radius yet. Enable more layers or widen the buffer.
+                  {(!proximityData || proximityData.total === 0) && !loading && !proximityData?.unavailable?.length && (
+                    <div className="rounded-lg border border-white/5 bg-slate-900/40 p-3 text-center text-xs text-slate-400" data-testid="poi-empty">
+                      No matching places in OpenStreetMap within this buffer. Enable more layers or widen the radius.
                     </div>
                   )}
                 </div>

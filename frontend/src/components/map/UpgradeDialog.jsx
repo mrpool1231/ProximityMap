@@ -35,7 +35,7 @@ export default function UpgradeDialog({ open, onOpenChange, reason, onBeforeChec
           </div>
           <DialogTitle className="font-heading text-xl">{reason || "This is a Pro feature"}</DialogTitle>
           <DialogDescription className="text-slate-400">
-            Unlock GeoPulse Pro once and keep it forever on this device — no account needed.
+            Unlock MapApp Pro once and keep it forever on this device — no account needed.
           </DialogDescription>
         </DialogHeader>
 
@@ -43,7 +43,7 @@ export default function UpgradeDialog({ open, onOpenChange, reason, onBeforeChec
           <div className="flex items-baseline justify-between">
             <div className="flex items-center gap-2">
               <Sparkles size={14} className="text-amber-300" />
-              <span className="font-heading font-semibold">{product?.name || "GeoPulse Pro"}</span>
+              <span className="font-heading font-semibold">{product?.name || "MapApp Pro"}</span>
             </div>
             <div className="font-mono text-2xl font-bold text-amber-300" data-testid="pro-price">
               {product ? `$${product.amount.toFixed(0)}` : "…"}

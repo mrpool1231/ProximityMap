@@ -9,7 +9,7 @@ stripe.api_key = os.environ.get("STRIPE_SECRET_KEY") or "sk_test_emergent"
 CATALOG = [
     {
         "emergent_product_id": "geopulse_pro",
-        "name": "GeoPulse Pro — Property Brief Pass",
+        "name": "MapApp Pro — Property Brief Pass",
         "description": "Unlocks printable PDF property briefs and shareable report links.",
         "tax_code": "txcd_10000000",
         "prices": [

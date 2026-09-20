@@ -16,10 +16,10 @@ export default function TopBar({ basemap, setBasemap, pin, onShare, onPrint, sha
         </div>
         <div>
           <div className="font-heading text-base font-bold tracking-tight" data-testid="app-title">
-            GeoPulse<span className="text-sky-400">.</span>Studio
+            Map<span className="text-sky-400">App</span>
           </div>
           <div className="text-[10px] font-mono uppercase tracking-widest text-slate-500">
-            Precision Data Cartography
+            Map · Layers · Proximity
           </div>
         </div>
       </div>

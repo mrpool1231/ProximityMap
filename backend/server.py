@@ -14,7 +14,6 @@ import uuid
 from datetime import datetime, timezone
 import httpx
 import asyncio
-from static_pois import NYC_STATIC_POIS, generate_synthetic
 
 
 ROOT_DIR = Path(__file__).parent
@@ -24,7 +23,7 @@ mongo_url = os.environ['MONGO_URL']
 client = AsyncIOMotorClient(mongo_url)
 db = client[os.environ['DB_NAME']]
 
-app = FastAPI(title="GeoPulse Studio API")
+app = FastAPI(title="MapApp API")
 api_router = APIRouter(prefix="/api")
 
 # ---------- Overpass Category Query Templates ----------
@@ -37,16 +36,22 @@ OVERPASS_ENDPOINTS = [
 # Simple in-memory POI cache: {(category, round(lat,4), round(lon,4), radius): [...]}
 _POI_CACHE: Dict[Any, List[Dict[str, Any]]] = {}
 
-CATEGORY_QUERIES: Dict[str, str] = {
-    "parks": '(node["leisure"="park"](around:{r},{lat},{lon});way["leisure"="park"](around:{r},{lat},{lon}););out center tags;',
-    "schools": '(node["amenity"="school"](around:{r},{lat},{lon});way["amenity"="school"](around:{r},{lat},{lon}););out center tags;',
-    "daycares": '(node["amenity"~"kindergarten|childcare"](around:{r},{lat},{lon});way["amenity"~"kindergarten|childcare"](around:{r},{lat},{lon}););out center tags;',
-    "gas_stations": '(node["amenity"="fuel"](around:{r},{lat},{lon});way["amenity"="fuel"](around:{r},{lat},{lon}););out center tags;',
-    "hospitals": '(node["amenity"="hospital"](around:{r},{lat},{lon});way["amenity"="hospital"](around:{r},{lat},{lon}););out center tags;',
-    "restaurants": '(node["amenity"="restaurant"](around:{r},{lat},{lon});way["amenity"="restaurant"](around:{r},{lat},{lon}););out center tags;',
-    "supermarkets": '(node["shop"="supermarket"](around:{r},{lat},{lon});way["shop"="supermarket"](around:{r},{lat},{lon}););out center tags;',
-    "ev_chargers": '(node["amenity"="charging_station"](around:{r},{lat},{lon}););out tags;',
+CATEGORY_FILTERS: Dict[str, List[str]] = {
+    "parks": ['["leisure"="park"]', '["leisure"="nature_reserve"]'],
+    "schools": ['["amenity"="school"]', '["amenity"="university"]', '["amenity"="college"]'],
+    "daycares": ['["amenity"~"^(kindergarten|childcare)$"]'],
+    "gas_stations": ['["amenity"="fuel"]'],
+    "hospitals": ['["amenity"~"^(hospital|clinic)$"]'],
+    "restaurants": ['["amenity"="restaurant"]'],
+    "supermarkets": ['["shop"="supermarket"]'],
+    "ev_chargers": ['["amenity"="charging_station"]'],
 }
+CATEGORY_QUERIES = CATEGORY_FILTERS  # kept for membership checks
+
+
+def build_query(category: str, r: int, lat: float, lon: float) -> str:
+    body = "".join(f"nwr{f}(around:{r},{lat},{lon});" for f in CATEGORY_FILTERS[category])
+    return f"[out:json][timeout:20];({body});out center tags;"
 
 def haversine(lat1, lon1, lat2, lon2):
     R = 6371000.0
@@ -92,7 +97,7 @@ TOMTOM_KEY = os.environ.get("TOMTOM_API_KEY", "").strip()
 # ---------- Routes ----------
 @api_router.get("/")
 async def root():
-    return {"service": "GeoPulse Studio API", "status": "ok"}
+    return {"service": "MapApp API", "status": "ok"}
 
 @api_router.post("/status", response_model=StatusCheck)
 async def create_status_check(input: StatusCheckCreate):
@@ -116,7 +121,7 @@ async def geocode(q: str = Query(..., min_length=1)):
     """Address search via Nominatim (OSM)."""
     url = "https://nominatim.openstreetmap.org/search"
     params = {"q": q, "format": "json", "limit": 6, "addressdetails": 1}
-    headers = {"User-Agent": "GeoPulseStudio/1.0"}
+    headers = {"User-Agent": "MapApp/1.0"}
     try:
         async with httpx.AsyncClient(timeout=15.0) as cli:
             r = await cli.get(url, params=params, headers=headers)
@@ -138,18 +143,19 @@ async def geocode(q: str = Query(..., min_length=1)):
         raise HTTPException(status_code=502, detail=f"geocode failed: {e}")
 
 
-async def _query_overpass(category: str, lat: float, lon: float, radius: int) -> List[Dict[str, Any]]:
-    if category not in CATEGORY_QUERIES:
+async def _query_overpass(category: str, lat: float, lon: float, radius: int) -> Optional[List[Dict[str, Any]]]:
+    """Live OSM data only. Returns None when every Overpass endpoint failed."""
+    if category not in CATEGORY_FILTERS:
         return []
     cache_key = (category, round(lat, 4), round(lon, 4), radius)
     cached = _POI_CACHE.get(cache_key)
     if cached is not None:
         return cached
 
-    q = "[out:json][timeout:8];" + CATEGORY_QUERIES[category].format(r=radius, lat=lat, lon=lon)
+    q = build_query(category, radius, lat, lon)
 
     async def _one(endpoint: str):
-        async with httpx.AsyncClient(timeout=8.0) as cli:
+        async with httpx.AsyncClient(timeout=25.0) as cli:
             r = await cli.post(endpoint, data={"data": q})
             r.raise_for_status()
             return r.json()
@@ -158,7 +164,7 @@ async def _query_overpass(category: str, lat: float, lon: float, radius: int) ->
     data = None
     try:
         while tasks:
-            done, pending = await asyncio.wait(tasks, return_when=asyncio.FIRST_COMPLETED, timeout=9.0)
+            done, pending = await asyncio.wait(tasks, return_when=asyncio.FIRST_COMPLETED, timeout=26.0)
             if not done:
                 break
             for d in done:
@@ -174,78 +180,57 @@ async def _query_overpass(category: str, lat: float, lon: float, radius: int) ->
         for t in tasks:
             t.cancel()
 
-    if not data:
-        # No live data — fall through to curated / synthetic fallback below.
-        out: List[Dict[str, Any]] = []
-    else:
-        out = []
-        for el in data.get("elements", []):
-            if el.get("type") == "node":
-                plat, plon = el.get("lat"), el.get("lon")
-            else:
-                c = el.get("center") or {}
-                plat, plon = c.get("lat"), c.get("lon")
-            if plat is None or plon is None:
-                continue
-            tags = el.get("tags", {}) or {}
-            out.append({
-                "id": f"{el.get('type')}/{el.get('id')}",
-                "lat": plat,
-                "lon": plon,
-                "name": tags.get("name") or tags.get("operator") or category.replace("_", " ").title(),
-                "category": category,
-                "tags": tags,
-                "distance_m": round(haversine(lat, lon, plat, plon), 1),
-            })
-
-    # Curated NYC dataset fallback
-    if not out and category in NYC_STATIC_POIS:
-        for p in NYC_STATIC_POIS[category]:
-            d = haversine(lat, lon, p["lat"], p["lon"])
-            if d <= radius:
-                out.append({
-                    "id": f"static-{category}-{p['name']}",
-                    "lat": p["lat"],
-                    "lon": p["lon"],
-                    "name": p["name"],
-                    "category": category,
-                    "curated": True,
-                    "tags": {},
-                    "distance_m": round(d, 1),
-                })
-
-    # Deterministic synthetic fallback so any coordinate returns data
-    if not out:
-        synth = generate_synthetic(category, lat, lon, radius, count=8)
-        for p in synth:
-            p["distance_m"] = round(haversine(lat, lon, p["lat"], p["lon"]), 1)
-            out.append(p)
+    if data is None:
+        return None
+    out: List[Dict[str, Any]] = []
+    for el in data.get("elements", []):
+        if el.get("type") == "node":
+            plat, plon = el.get("lat"), el.get("lon")
+        else:
+            c = el.get("center") or {}
+            plat, plon = c.get("lat"), c.get("lon")
+        if plat is None or plon is None:
+            continue
+        tags = el.get("tags", {}) or {}
+        out.append({
+            "id": f"{el.get('type')}/{el.get('id')}",
+            "lat": plat,
+            "lon": plon,
+            "name": tags.get("name") or tags.get("brand") or tags.get("operator") or f"Unnamed {category.replace('_', ' ').rstrip('s')}",
+            "category": category,
+            "tags": tags,
+            "distance_m": round(haversine(lat, lon, plat, plon), 1),
+        })
 
     out.sort(key=lambda x: x["distance_m"])
     _POI_CACHE[cache_key] = out
     if len(_POI_CACHE) > 500:
-        # simple size cap: drop an arbitrary oldest-ish entry
         _POI_CACHE.pop(next(iter(_POI_CACHE)))
     return out
 
 
 @api_router.get("/pois")
 async def get_pois(
-    lat: float = Query(...),
-    lon: float = Query(...),
+    lat: float = Query(..., ge=-90, le=90),
+    lon: float = Query(..., ge=-180, le=180),
     radius: int = Query(3000, ge=50, le=25000),
     categories: str = Query("parks,schools,daycares,gas_stations"),
 ):
-    """Fetch POIs from Overpass within radius grouped by category."""
-    cats = [c.strip() for c in categories.split(",") if c.strip() in CATEGORY_QUERIES]
-    tasks = [_query_overpass(c, lat, lon, radius) for c in cats]
-    results = await asyncio.gather(*tasks)
+    """Fetch real OpenStreetMap POIs within radius grouped by category."""
+    cats = [c.strip() for c in categories.split(",") if c.strip() in CATEGORY_FILTERS]
+    results = await asyncio.gather(*[_query_overpass(c, lat, lon, radius) for c in cats])
+    ok = {c: r for c, r in zip(cats, results) if r is not None}
+    unavailable = [c for c, r in zip(cats, results) if r is None]
+    if cats and not ok:
+        raise HTTPException(status_code=503, detail="Live OpenStreetMap data is unavailable right now")
     return {
         "center": {"lat": lat, "lon": lon},
         "radius": radius,
-        "categories": {c: r for c, r in zip(cats, results)},
-        "counts": {c: len(r) for c, r in zip(cats, results)},
-        "total": sum(len(r) for r in results),
+        "categories": ok,
+        "counts": {c: len(r) for c, r in ok.items()},
+        "total": sum(len(r) for r in ok.values()),
+        "unavailable": unavailable,
+        "source": "osm",
     }
 
 
