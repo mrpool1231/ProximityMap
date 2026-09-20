@@ -1,0 +1,53 @@
+{
+  "summary": "Iteration 9 — password reset by emailed link (forgot-password + reset-password + frontend flows). Backend pytest /app/backend/tests/test_password_reset.py 9/9 PASSED (3.90s). Frontend Playwright 8/8 flows PASSED. All acceptance criteria from the review request are met.",
+  "backend_tests": {
+    "forgot_password": [
+      "non-existent email → 200 generic {ok:true, message:'If an account exists...'} and password_reset_tokens count unchanged (no doc created for unknown email) — PASS",
+      "invalid email format ('not-an-email') → 422 — PASS",
+      "existing user (delivered@resend.dev, auto-registered if missing) → 200 generic; exactly 1 new doc in password_reset_tokens with sha256 token_hash (64 hex chars), used=false, expires_at set — PASS",
+      "rate limit: 4 calls for same existing user within 1h → all return 200 generic; exactly 3 token docs in Mongo — PASS"
+    ],
+    "reset_password_e2e": [
+      "insert token T (sha256 hash) via Mongo for freshly registered user; POST /api/auth/reset-password {token:T, password:'Fresh#Pass2026'} → 200 user JSON + Set-Cookie access_token & refresh_token; /api/auth/me works; token row.used=true in Mongo — PASS",
+      "login with new password → 200 — PASS",
+      "login with old password → 401 — PASS",
+      "re-using same T → 400 'This reset link is invalid or has expired.' — PASS",
+      "expired token (expires_at in the past) → 400 invalid/expired — PASS",
+      "bogus token (40 x 'a') → 400 — PASS",
+      "short password ('short') → 422 — PASS"
+    ],
+    "regression": "admin@mapapp.app / Ma-XjKTb93osTQxQhe1wD → 200 role=admin is_pro=true — PASS"
+  },
+  "frontend_tests": [
+    "sign-in-button → auth-dialog opens — PASS",
+    "forgot-password-link → forgot-form shown — PASS",
+    "submit forgot-email-input 'delivered@resend.dev' → forgot-sent confirmation banner — PASS",
+    "forgot-back-button returns to login-form — PASS",
+    "/reset-password (no token) → reset-missing-token — PASS",
+    "/reset-password?token=<bogus 30 'a'> → reset-form; mismatched passwords → reset-error 'Passwords do not match'; matching bogus → reset-error 'This reset link is invalid or has expired. Request a new one.' — PASS",
+    "/reset-password?token=<valid Mongo-inserted token for fresh user> → reset-done shown, auto-redirect to '/', account-menu-button visible (signed in) — PASS",
+    "regression: admin login via UI (admin@mapapp.app) → account-menu-button — PASS"
+  ],
+  "backend_issues": {"critical": [], "minor": []},
+  "frontend_issues": {"ui_bugs": [], "integration_issues": [], "design_issues": []},
+  "test_report_links": [
+    "/app/backend/tests/test_password_reset.py",
+    "/app/test_reports/pytest/iter9.xml"
+  ],
+  "action_items": [],
+  "critical_code_review_comments": [
+    "auth.py reset_password: users.update_one uses row['_id'] to mark used=true — works but couples to Mongo primary key; using token_hash filter would be equivalent and consistent with the read path. Non-blocking.",
+    "auth.py forgot_password: rate limit is per-user (RESET_MAX_PER_HOUR=3) but NOT per-IP or per-email — a malicious actor probing many known emails is not throttled globally. Consider a per-IP hourly cap too. Non-blocking / hardening.",
+    "auth.py forgot_password: send_email() can raise HTTPException(502) from emailer.py if Emergent proxy fails, breaking the 'always generic' contract by leaking a 502 to the client. Consider wrapping send_email in try/except and still returning the generic 200 so timing/errors can't be used to enumerate accounts. Recommended fix.",
+    "auth.py reset_password: on success, all previous unused tokens for the same user are NOT invalidated — a stolen prior token (still within TTL) remains usable until it expires or is used. Consider invalidating siblings ({user_id, used:false} → used:true) after success.",
+    "ResetPassword.jsx: on backend failure the error is set from err.response?.data?.detail — works, but pending state stays cleared (good). No accessibility label on password inputs (aria-label). Minor."
+  ],
+  "updated_files": ["/app/backend/tests/test_password_reset.py (new, 9 tests)"],
+  "success_rate": {"backend": "9/9 (100%)", "frontend": "8/8 (100%)"},
+  "test_credentials": "admin@mapapp.app / Ma-XjKTb93osTQxQhe1wD; delivered@resend.dev / Tester#2026 (auto-registered by fixture if not present, kept as-is — reset e2e uses fresh users only)",
+  "seed_data_creation": "Fixture creates fresh random users (test_reset_<uuid>@example.com) for E2E and deletes them + their password_reset_tokens on teardown. Also cleaned up ui_reset_* user and stray password_reset_tokens post-frontend testing.",
+  "retest_needed": false,
+  "main_agent_can_self_test": true,
+  "context_for_next_testing_agent": "Password reset flow verified end-to-end. Token stored as sha256(token) in password_reset_tokens; TTL 1h; per-user limit 3/h; reset endpoint sets both cookies, marks token used, wipes login_attempts. Frontend routes: forgot lives inside AuthDialog (setForgot state); /reset-password page reads ?token= param — missing token shows reset-missing-token, otherwise reset-form. All data-testids present. Consider hardening notes in critical_code_review_comments for future iterations.",
+  "rca of the issue": "N/A — feature works as specified."
+}

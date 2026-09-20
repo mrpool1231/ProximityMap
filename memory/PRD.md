@@ -108,6 +108,13 @@ links) are unlocked with a one-time Stripe payment.
 - Deployment agent check: pass. Stripe account claim (KYC) is a user action.
 - Testing: iteration_8 — backend 11/11, frontend all pass.
 
+### 2026-09-20 — Password reset by email
+- Emergent managed email (`emailer.py`, EMERGENT_EMAIL_KEY + EMAIL_FROM_NAME="MapApp").
+  `POST /api/auth/forgot-password` (generic response, 3/hour, sha256 token, 1h TTL) and
+  `POST /api/auth/reset-password` (single-use, signs user in). UI: "Forgot your password?"
+  in AuthDialog, `/reset-password?token=` page. Testing: iteration_9 — 9/9 backend, 8/8 frontend.
+- Deployment: user publishes via Publish panel; custom domain via Publish → Manage Publishes → Domain.
+
 ## Design system
 See `/app/design_guidelines.json` — Outfit / Manrope / IBM Plex Mono type,
 `#0B0F17` obsidian base + tactical signal accent (`#38BDF8`, `#F59E0B`,
@@ -116,7 +123,6 @@ See `/app/design_guidelines.json` — Outfit / Manrope / IBM Plex Mono type,
 ## Prioritized backlog
 ### P1
 
-- Password reset by email (needs an email provider, e.g. Resend).
 - Population density heatmap (real data source).
 ### P2
 - Time-slider for weather / AQI trends.
