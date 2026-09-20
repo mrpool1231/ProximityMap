@@ -73,7 +73,7 @@ links) are unlocked with a one-time Stripe payment.
 - **Compare properties**: outline B (teal) via `PropertyTools`, own POI fetch,
   `CompareScorecard` (count + nearest per category, row winners, verdict) in
   the panel and in the print brief; B included in share-link state.
-- Traffic layer still awaiting `TOMTOM_API_KEY` (user did not supply one).
+- Traffic layer LIVE since 2026-09-20 (user supplied TOMTOM_API_KEY; stored in backend/.env).
 - Testing: iteration_5 — backend 16/16, all frontend flows pass.
 
 ### 2026-09-19 — ChatGPT integration
@@ -107,7 +107,7 @@ See `/app/design_guidelines.json` — Outfit / Manrope / IBM Plex Mono type,
 
 ## Prioritized backlog
 ### P1
-- Provide `TOMTOM_API_KEY` to turn on the traffic layer.
+
 - Password reset by email (needs an email provider, e.g. Resend).
 - Population density heatmap (real data source).
 ### P2
