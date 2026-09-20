@@ -1,0 +1,36 @@
+{
+  "summary": "Iteration 7 - LOCATION ACCURACY verification for MapApp POIs. Backend pytest (/app/backend/tests/test_pois.py, 5 tests): (1) GET /api/ returns service 'MapApp API' PASS. (2) GET /api/payments/products includes 'MapApp Pro' PASS. (3) GET /api/pois lat=99 -> 422 PASS. (4) GET /api/pois lat=0&lon=-30&radius=1000&categories=gas_stations returns counts.gas_stations==0 with empty list (no fabrication) PASS. (5) GET /api/pois?lat=40.7328&lon=-74.0115&radius=1500&categories=parks,schools returns source:'osm', all ids match ^(node|way|relation)/\\d+$, no synthetic/curated flags, distance_m equals haversine within 2 m for every item — FAIL only on one edge case: way/264637733 'Xavier High School' has centroid distance 1516.6 m > radius 1500 m (Overpass 'around' matches ways with any node within radius, so way centroid can legitimately exceed radius). No fabrication involved. Frontend (60s POI wait): page title 'MapApp', data-testid=app-title text 'MapApp'. Dropped pin at leaflet center offset (-150,+120). Both poi-source AND poi-unavailable-banner rendered (mixed state: parks+schools returned live, other selected categories unavailable). poi-source text: 'Live OpenStreetMap data · straight-line distances'. 10 POI list items observed, all real OSM names (e.g. James J Walker Park, Bleecker Playground, School for Poetic Computation, Barrow Street Nursery School, Public School 3, Public School 621). No '#N' fabricated names, no legacy curated names ('Shell - Houston St', 'Mobil - 10th Ave'). poi-retry-button present; clicking triggered 'Fetching POIs...' loading state.",
+  "backend_issues": {
+    "critical": [],
+    "minor": [
+      {"endpoint": "/api/pois", "issue": "For way/relation results, item.lat/lon is the Overpass 'center' (centroid); centroid distance can exceed the requested radius (e.g. Xavier High School 1516.6m vs radius 1500m) because Overpass 'around' matches any node of the way within the radius. Distance math is correct, only the display coordinate is the centroid. Consider either (a) filter out items whose centroid distance > radius, or (b) document this behaviour. Not a fabrication bug."}
+    ]
+  },
+  "frontend_issues": {
+    "ui_bugs": [],
+    "integration_issues": [],
+    "design_issues": [
+      {"screen": "Global console", "issues": ["Same pre-existing net::ERR_CONNECTION_REFUSED noise from disabled traffic tiles (already documented in iterations 5 and 6). Not blocking."]}
+    ]
+  },
+  "test_report_links": [
+    "/app/backend/tests/test_pois.py",
+    "/app/test_reports/pytest/pytest_iter7_pois.xml"
+  ],
+  "action_items": [
+    "(Optional / minor) In backend server.py _query_overpass, drop items whose centroid haversine > radius, or expose a 'centroid' flag for way/relation so the frontend can label them as approximate."
+  ],
+  "critical_code_review_comments": [
+    "server.py get_pois: unavailable list works, but the 503 branch (all cats unavailable) means the frontend cannot distinguish 'partial success + some unavailable' from 'no POI request made' — currently it works because at least one category usually succeeds. Consider always returning 200 with categories={} and unavailable=[...] so the poi-unavailable-banner path is uniform.",
+    "server.py _query_overpass caches None-returns is avoided (good), but for successful empty lists it caches [] indefinitely per (cat,lat4dp,lon4dp,radius). For live OSM freshness a TTL would be safer.",
+    "server.py fallback name 'Unnamed park' etc. is fine, but consider omitting the trailing 's' more carefully (currently rstrip('s') would turn 'bus' -> 'bu'; safe for the current CATEGORY_FILTERS keys but fragile)."
+  ],
+  "updated_files": ["/app/backend/tests/test_pois.py (new, 5 tests)"],
+  "success_rate": {"backend": "4/5 (80%) — 1 edge-case distance-vs-radius failure, not fabrication", "frontend": "100% of POI accuracy flow verified"},
+  "test_credentials": "Not required for this iteration",
+  "seed_data_creation": "None",
+  "retest_needed": false,
+  "main_agent_can_self_test": true,
+  "context_for_next_testing_agent": "POI accuracy fix confirmed: no static-/synth- ids, no curated names, source='osm', unavailable[] array present, retry button re-fetches. The one backend distance edge case is an Overpass 'around' semantic (way centroid vs boundary) — not a regression. Selectors: app-title, drop-pin-button, poi-source, poi-unavailable-banner, poi-empty, poi-retry-button, poi-distance-item-<cat>-<i>. Overpass from this pod is slow (~25-45s) and often marks some categories unavailable — that is acceptable and NOT fabricated.",
+  "rca of the issue": "Not applicable — the fabrication bug (curated NYC fallback + synthetic POIs) is fully resolved. Backend now returns only live Overpass results (ids of the form node|way|relation/<id>), an 'unavailable' array for failed categories, and no synthetic/curated flags. Frontend renders poi-unavailable-banner + poi-retry-button for missing categories and poi-source for live data, with real OSM names in the list."
+}

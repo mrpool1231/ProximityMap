@@ -56,12 +56,14 @@ async function _postOverpass(query, signal) {
   return Promise.any(attempts);
 }
 
-export function normalizeElements(elements, category, lat, lon) {
+export function normalizeElements(elements, category, lat, lon, radius = Infinity) {
   const out = [];
   for (const el of elements || []) {
     const plat = el.type === "node" ? el.lat : el.center?.lat;
     const plon = el.type === "node" ? el.lon : el.center?.lon;
     if (plat == null || plon == null) continue;
+    const distance_m = Math.round(haversine(lat, lon, plat, plon) * 10) / 10;
+    if (distance_m > radius) continue; // ways touching the radius edge: keep centroid inside
     const tags = el.tags || {};
     out.push({
       id: `${el.type}/${el.id}`,
@@ -70,7 +72,7 @@ export function normalizeElements(elements, category, lat, lon) {
       name: tags.name || tags.brand || tags.operator || `Unnamed ${category.replace("_", " ").replace(/s$/, "")}`,
       category,
       tags,
-      distance_m: Math.round(haversine(lat, lon, plat, plon) * 10) / 10,
+      distance_m,
     });
   }
   return out.sort((a, b) => a.distance_m - b.distance_m);
@@ -88,7 +90,7 @@ export async function queryCategory({ category, lat, lon, radius, signal }) {
   } catch {
     return null;
   }
-  const out = normalizeElements(data.elements, category, lat, lon);
+  const out = normalizeElements(data.elements, category, lat, lon, radius);
   _cache.set(k, out);
   return out;
 }

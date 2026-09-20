@@ -1,4 +1,4 @@
-# GeoPulse Studio — PRD
+# MapApp (formerly GeoPulse Studio) — PRD
 
 ## Original problem statement
 > i need an app about maps that can be over layed by any additional parameter
@@ -87,6 +87,18 @@ links) are unlocked with a one-time Stripe payment.
   for anonymous users then paywall, unlimited for Pro. `AISummary` section in
   the print brief ("Generate with ChatGPT").
 - Testing: iteration_6 — backend 8/8, all frontend flows pass.
+
+### 2026-09-20 — Location-accuracy audit + rename to MapApp
+- **Removed all fabricated POI data** (curated NYC list + synthetic generator,
+  both backend and frontend). POIs are live OpenStreetMap only; browser
+  Overpass and backend `/api/pois` are raced per category; failures surface
+  as `unavailable` with a banner + Retry (never substituted). Queries use
+  `nwr` (relations included), park filter = park + nature_reserve, results
+  with centroid beyond the radius are dropped, `source: "osm"` returned.
+- Renamed app to **MapApp** everywhere (title, header, brief, dialogs, AI
+  persona, Stripe product name, API title). localStorage keys unchanged.
+- Testing: iteration_7 — pass (one edge case fixed afterwards: way centroid
+  just beyond radius now filtered).
 
 ## Design system
 See `/app/design_guidelines.json` — Outfit / Manrope / IBM Plex Mono type,

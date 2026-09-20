@@ -191,6 +191,9 @@ async def _query_overpass(category: str, lat: float, lon: float, radius: int) ->
             plat, plon = c.get("lat"), c.get("lon")
         if plat is None or plon is None:
             continue
+        dist = round(haversine(lat, lon, plat, plon), 1)
+        if dist > radius:  # Overpass matches ways touching the radius; keep centroid inside it
+            continue
         tags = el.get("tags", {}) or {}
         out.append({
             "id": f"{el.get('type')}/{el.get('id')}",
@@ -199,7 +202,7 @@ async def _query_overpass(category: str, lat: float, lon: float, radius: int) ->
             "name": tags.get("name") or tags.get("brand") or tags.get("operator") or f"Unnamed {category.replace('_', ' ').rstrip('s')}",
             "category": category,
             "tags": tags,
-            "distance_m": round(haversine(lat, lon, plat, plon), 1),
+            "distance_m": dist,
         })
 
     out.sort(key=lambda x: x["distance_m"])
