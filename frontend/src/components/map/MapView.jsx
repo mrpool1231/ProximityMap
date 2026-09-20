@@ -111,6 +111,7 @@ export default function MapView({
       data-testid="map-container"
     >
       <TileLayer key={basemap} url={bm.url} attribution={bm.attribution} className={bm.className || ""} />
+      {bm.overlay && <TileLayer key={`${basemap}-overlay`} url={bm.overlay} zIndex={350} />}
       {trafficTileUrl && layerVisibility.traffic && (
         <TileLayer
           key="traffic"

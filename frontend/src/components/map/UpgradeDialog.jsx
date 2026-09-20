@@ -68,7 +68,11 @@ export default function UpgradeDialog({ open, onOpenChange, reason, onBeforeChec
             Unlock Pro
           </Button>
         </div>
-        <p className="text-center text-[10px] text-slate-500">Secure checkout by Stripe · Test card 4242 4242 4242 4242</p>
+        <p className="text-center text-[10px] text-slate-500">
+          Secure checkout by Stripe · Test card 4242 4242 4242 4242 · By purchasing you agree to our{" "}
+          <a href="/legal/terms" target="_blank" rel="noreferrer" className="underline hover:text-slate-300" data-testid="upgrade-terms-link">Terms</a> and{" "}
+          <a href="/legal/refunds" target="_blank" rel="noreferrer" className="underline hover:text-slate-300" data-testid="upgrade-refunds-link">Refund policy</a>
+        </p>
       </DialogContent>
     </Dialog>
   );

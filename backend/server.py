@@ -1,6 +1,7 @@
 from fastapi import FastAPI, APIRouter, HTTPException, Query, Path as FPath
 from fastapi.responses import Response
 import secrets
+from urllib.parse import quote
 from dotenv import load_dotenv
 from starlette.middleware.cors import CORSMiddleware
 from motor.motor_asyncio import AsyncIOMotorClient
@@ -118,7 +119,29 @@ async def get_status_checks():
 
 @api_router.get("/geocode")
 async def geocode(q: str = Query(..., min_length=1)):
-    """Address search via Nominatim (OSM)."""
+    """Address / place search — TomTom Search (commercial) with Nominatim fallback."""
+    if TOMTOM_KEY:
+        try:
+            async with httpx.AsyncClient(timeout=10.0) as cli:
+                r = await cli.get(f"https://api.tomtom.com/search/2/search/{quote(q)}.json", params={"key": TOMTOM_KEY, "limit": 6, "typeahead": "false"})
+                r.raise_for_status()
+                rows = r.json().get("results", [])
+            results = []
+            for row in rows:
+                poi = row.get("poi") or {}
+                addr = (row.get("address") or {}).get("freeformAddress", "")
+                results.append({
+                    "display_name": f"{poi['name']}, {addr}" if poi.get("name") else addr,
+                    "lat": row["position"]["lat"],
+                    "lon": row["position"]["lon"],
+                    "type": row.get("type", "").lower(),
+                    "class": (poi.get("categories") or ["address"])[0],
+                    "importance": row.get("score", 0),
+                })
+            if results:
+                return {"results": results, "provider": "tomtom"}
+        except (httpx.HTTPError, KeyError):
+            pass
     url = "https://nominatim.openstreetmap.org/search"
     params = {"q": q, "format": "json", "limit": 6, "addressdetails": 1}
     headers = {"User-Agent": "MapApp/1.0"}
@@ -138,9 +161,40 @@ async def geocode(q: str = Query(..., min_length=1)):
             }
             for row in data
         ]
-        return {"results": results}
+        return {"results": results, "provider": "nominatim"}
     except httpx.HTTPError as e:
         raise HTTPException(status_code=502, detail=f"geocode failed: {e}")
+
+
+BASEMAP_STYLES = {
+    "night": ("basic/night", "png"),
+    "main": ("basic/main", "png"),
+    "sat": ("sat/main", "jpg"),
+    "hybrid": ("hybrid/main", "png"),
+}
+
+
+@api_router.get("/basemap/config")
+async def basemap_config():
+    return {"provider": "tomtom" if TOMTOM_KEY else "osm"}
+
+
+@api_router.get("/basemap/{style}/{z}/{x}/{y}")
+async def basemap_tile(style: str, z: int = FPath(ge=0, le=22), x: int = FPath(ge=0), y: int = FPath(ge=0)):
+    if style not in BASEMAP_STYLES or x >= (1 << z) or y >= (1 << z):
+        raise HTTPException(status_code=400, detail="invalid tile request")
+    if not TOMTOM_KEY:
+        raise HTTPException(status_code=404, detail="commercial basemap not configured")
+    path, ext = BASEMAP_STYLES[style]
+    url = f"https://api.tomtom.com/map/1/tile/{path}/{z}/{x}/{y}.{ext}"
+    try:
+        async with httpx.AsyncClient(timeout=10.0) as cli:
+            up = await cli.get(url, params={"key": TOMTOM_KEY})
+    except httpx.RequestError:
+        raise HTTPException(status_code=502, detail="basemap provider unavailable")
+    if up.status_code != 200:
+        raise HTTPException(status_code=502 if up.status_code != 404 else 404, detail="basemap tile error")
+    return Response(content=up.content, media_type="image/jpeg" if ext == "jpg" else "image/png", headers={"Cache-Control": "public, max-age=86400"})
 
 
 async def _query_overpass(category: str, lat: float, lon: float, radius: int) -> Optional[List[Dict[str, Any]]]:

@@ -43,25 +43,14 @@ export const LAYER_BY_ID = Object.fromEntries(
   [...POI_LAYERS, ...ENV_LAYERS, ...CONCEPT_LAYERS].map((l) => [l.id, l])
 );
 
+const TILES = `${process.env.REACT_APP_BACKEND_URL}/api/basemap`;
+const TOMTOM_ATTR = '&copy; <a href="https://www.tomtom.com/">TomTom</a>';
+
+// Commercial TomTom basemaps proxied through the backend (key stays server-side)
 export const BASEMAPS = {
-  dark: {
-    label: "Dark Matter",
-    url: "https://tile.openstreetmap.org/{z}/{x}/{y}.png",
-    attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>',
-    className: "map-tiles-dark",
-  },
-  positron: {
-    label: "Minimal Light",
-    url: "https://tile.openstreetmap.org/{z}/{x}/{y}.png",
-    attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>',
-    className: "map-tiles-light",
-  },
-  satellite: {
-    label: "Satellite",
-    url: "https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}",
-    attribution: "Tiles &copy; Esri",
-    className: "",
-  },
+  dark: { label: "Dark Matter", url: `${TILES}/night/{z}/{x}/{y}`, attribution: TOMTOM_ATTR, className: "" },
+  positron: { label: "Minimal Light", url: `${TILES}/main/{z}/{x}/{y}`, attribution: TOMTOM_ATTR, className: "" },
+  satellite: { label: "Satellite", url: `${TILES}/sat/{z}/{x}/{y}`, overlay: `${TILES}/hybrid/{z}/{x}/{y}`, attribution: TOMTOM_ATTR, className: "" },
 };
 
 export const DEFAULT_CENTER = [40.7484, -73.9857]; // Empire State Building

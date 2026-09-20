@@ -4,6 +4,7 @@ import { Toaster } from "@/components/ui/sonner";
 import MapWorkstation from "@/pages/MapWorkstation";
 import PaymentSuccess from "@/pages/PaymentSuccess";
 import PaymentCancel from "@/pages/PaymentCancel";
+import LegalPage from "@/pages/LegalPage";
 import { AuthProvider } from "@/context/AuthContext";
 
 function App() {
@@ -15,6 +16,8 @@ function App() {
             <Route path="/" element={<MapWorkstation />} />
             <Route path="/payment/success" element={<PaymentSuccess />} />
             <Route path="/payment/cancel" element={<PaymentCancel />} />
+            <Route path="/legal/:page" element={<LegalPage />} />
+            <Route path="/legal" element={<LegalPage />} />
           </Routes>
         </BrowserRouter>
       </AuthProvider>

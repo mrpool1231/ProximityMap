@@ -3,7 +3,7 @@ import { MapContainer, TileLayer, Marker, CircleMarker } from "react-leaflet";
 import L from "leaflet";
 import { Button } from "@/components/ui/button";
 import { Printer, X, Compass } from "lucide-react";
-import { LAYER_BY_ID } from "@/lib/mapConfig";
+import { LAYER_BY_ID, BASEMAPS } from "@/lib/mapConfig";
 import { propertyBuffer, bufferBounds } from "@/lib/geo";
 import { BufferOverlay } from "@/components/map/MapView";
 import { authApi } from "@/lib/api";
@@ -84,7 +84,7 @@ export default function PrintReport({ open, onClose, pin, radius, property, prop
 
         <div className="print-map mb-6 overflow-hidden rounded-xl border border-slate-300" style={{ height: 340 }}>
           <MapContainer bounds={bounds} className="h-full w-full" zoomControl={false} dragging={false} scrollWheelZoom={false} doubleClickZoom={false} touchZoom={false} keyboard={false} preferCanvas>
-            <TileLayer url="https://tile.openstreetmap.org/{z}/{x}/{y}.png" attribution="&copy; OpenStreetMap" className="map-tiles-light" />
+            <TileLayer url={BASEMAPS.positron.url} attribution="&copy; TomTom" />
             <BufferOverlay pin={pin} radius={radius} property={property} />
             {propertyB && <BufferOverlay radius={radius} property={propertyB} variant="B" />}
             <Marker position={pin} icon={pinIcon} />
@@ -170,7 +170,7 @@ export default function PrintReport({ open, onClose, pin, radius, property, prop
         </div>
 
         <footer className="mt-8 border-t border-slate-200 pt-3 text-[10px] text-slate-500">
-          Map data © OpenStreetMap contributors · Weather, air quality & elevation via Open-Meteo · Distances are straight-line{property ? " from the property boundary" : " from the analysis center"}.
+          Basemap © TomTom · Places © OpenStreetMap contributors · Weather, air quality & elevation via Open-Meteo · Distances are straight-line{property ? " from the property boundary" : " from the analysis center"}.
         </footer>
       </article>
     </div>,

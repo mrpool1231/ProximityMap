@@ -68,7 +68,11 @@ export default function AuthDialog({ open, onOpenChange, defaultTab = "login" })
       <DialogContent className="max-w-sm border-white/10 bg-[#0b0f17] text-slate-100" data-testid="auth-dialog">
         <DialogHeader>
           <DialogTitle className="font-heading text-xl">Your MapApp account</DialogTitle>
-          <DialogDescription className="text-slate-400">Sign in so your Pro pass and brief branding follow you to any device.</DialogDescription>
+          <DialogDescription className="text-slate-400">
+            Sign in so your Pro pass and brief branding follow you to any device. By continuing you accept our{" "}
+            <a href="/legal/terms" target="_blank" rel="noreferrer" className="underline hover:text-slate-200">Terms</a> and{" "}
+            <a href="/legal/privacy" target="_blank" rel="noreferrer" className="underline hover:text-slate-200">Privacy Policy</a>.
+          </DialogDescription>
         </DialogHeader>
         <Tabs defaultValue={defaultTab}>
           <TabsList className="grid w-full grid-cols-2 bg-slate-900/60">

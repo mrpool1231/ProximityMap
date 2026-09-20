@@ -1,7 +1,7 @@
 import { Button } from "@/components/ui/button";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger, DropdownMenuLabel, DropdownMenuSeparator } from "@/components/ui/dropdown-menu";
 import { BASEMAPS } from "@/lib/mapConfig";
-import { Compass, Layers2, Github, Share2, Printer, Loader2, Sparkles, Lock } from "lucide-react";
+import { Compass, Layers2, Share2, Printer, Loader2, Sparkles, Lock } from "lucide-react";
 import AccountMenu from "@/components/map/AccountMenu";
 
 export default function TopBar({ basemap, setBasemap, pin, onShare, onPrint, sharing, isPro, onUpgrade, onSignIn, onBranding }) {
@@ -100,13 +100,8 @@ export default function TopBar({ basemap, setBasemap, pin, onShare, onPrint, sha
           </DropdownMenuContent>
         </DropdownMenu>
         <AccountMenu onSignIn={onSignIn} onBranding={onBranding} />
-        <a
-          href="https://www.openstreetmap.org/copyright"
-          target="_blank"
-          rel="noreferrer"
-          className="hidden text-slate-500 hover:text-slate-300 md:block"
-        >
-          <Github size={14} />
+        <a href="/legal/terms" className="hidden font-mono text-[10px] uppercase tracking-widest text-slate-500 hover:text-slate-300 md:block" data-testid="legal-link">
+          Legal
         </a>
       </div>
     </header>
