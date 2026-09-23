@@ -24,7 +24,7 @@ mongo_url = os.environ['MONGO_URL']
 client = AsyncIOMotorClient(mongo_url)
 db = client[os.environ['DB_NAME']]
 
-app = FastAPI(title="MapApp API")
+app = FastAPI(title="ProximityMap API")
 api_router = APIRouter(prefix="/api")
 
 # ---------- Overpass Category Query Templates ----------
@@ -38,11 +38,11 @@ OVERPASS_ENDPOINTS = [
 _POI_CACHE: Dict[Any, List[Dict[str, Any]]] = {}
 
 CATEGORY_FILTERS: Dict[str, List[str]] = {
-    "parks": ['["leisure"="park"]', '["leisure"="nature_reserve"]'],
-    "schools": ['["amenity"="school"]', '["amenity"="university"]', '["amenity"="college"]'],
+    "parks": ['["leisure"~"^(park|nature_reserve|recreation_ground|common)$"]'],
+    "schools": ['["amenity"~"^(school|university|college)$"]'],
     "daycares": ['["amenity"~"^(kindergarten|childcare)$"]'],
     "gas_stations": ['["amenity"="fuel"]'],
-    "hospitals": ['["amenity"~"^(hospital|clinic)$"]'],
+    "hospitals": ['["amenity"~"^(hospital|clinic)$"]', '["healthcare"~"^(hospital|clinic)$"]'],
     "restaurants": ['["amenity"="restaurant"]'],
     "supermarkets": ['["shop"="supermarket"]'],
     "ev_chargers": ['["amenity"="charging_station"]'],
@@ -98,7 +98,7 @@ TOMTOM_KEY = os.environ.get("TOMTOM_API_KEY", "").strip()
 # ---------- Routes ----------
 @api_router.get("/")
 async def root():
-    return {"service": "MapApp API", "status": "ok"}
+    return {"service": "ProximityMap API", "status": "ok"}
 
 @api_router.post("/status", response_model=StatusCheck)
 async def create_status_check(input: StatusCheckCreate):
@@ -144,7 +144,7 @@ async def geocode(q: str = Query(..., min_length=1)):
             pass
     url = "https://nominatim.openstreetmap.org/search"
     params = {"q": q, "format": "json", "limit": 6, "addressdetails": 1}
-    headers = {"User-Agent": "MapApp/1.0"}
+    headers = {"User-Agent": "ProximityMap/1.0"}
     try:
         async with httpx.AsyncClient(timeout=15.0) as cli:
             r = await cli.get(url, params=params, headers=headers)
@@ -237,7 +237,12 @@ async def _query_overpass(category: str, lat: float, lon: float, radius: int) ->
     if data is None:
         return None
     out: List[Dict[str, Any]] = []
+    seen_ids = set()
     for el in data.get("elements", []):
+        element_id = f"{el.get('type')}/{el.get('id')}"
+        if element_id in seen_ids:
+            continue
+        seen_ids.add(element_id)
         if el.get("type") == "node":
             plat, plon = el.get("lat"), el.get("lon")
         else:
@@ -250,7 +255,7 @@ async def _query_overpass(category: str, lat: float, lon: float, radius: int) ->
             continue
         tags = el.get("tags", {}) or {}
         out.append({
-            "id": f"{el.get('type')}/{el.get('id')}",
+            "id": element_id,
             "lat": plat,
             "lon": plon,
             "name": tags.get("name") or tags.get("brand") or tags.get("operator") or f"Unnamed {category.replace('_', ' ').rstrip('s')}",

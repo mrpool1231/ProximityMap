@@ -1,8 +1,9 @@
 import { Button } from "@/components/ui/button";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger, DropdownMenuLabel, DropdownMenuSeparator } from "@/components/ui/dropdown-menu";
-import { UserRound, LogOut, Palette, Sparkles } from "lucide-react";
+import { UserRound, LogOut, Palette, Sparkles, CreditCard } from "lucide-react";
 import { useAuth } from "@/context/AuthContext";
 import { toast } from "sonner";
+import { createBillingPortal } from "@/lib/api";
 
 export default function AccountMenu({ onSignIn, onBranding }) {
   const { user, logout } = useAuth();
@@ -44,6 +45,22 @@ export default function AccountMenu({ onSignIn, onBranding }) {
         <DropdownMenuItem onClick={onBranding} className="cursor-pointer text-sm hover:bg-slate-800 focus:bg-slate-800 focus:text-sky-300" data-testid="branding-menu-item">
           <Palette size={13} className="mr-2" /> Brief branding
         </DropdownMenuItem>
+        {user.is_pro && user.pro_subscription_id && (
+          <DropdownMenuItem
+            onClick={async () => {
+              try {
+                const { portal_url } = await createBillingPortal();
+                window.location.href = portal_url;
+              } catch (e) {
+                toast.error(e?.response?.data?.detail || "Could not open billing portal");
+              }
+            }}
+            className="cursor-pointer text-sm hover:bg-slate-800 focus:bg-slate-800 focus:text-sky-300"
+            data-testid="manage-subscription-menu-item"
+          >
+            <CreditCard size={13} className="mr-2" /> Manage subscription
+          </DropdownMenuItem>
+        )}
         <DropdownMenuItem
           onClick={async () => {
             await logout();

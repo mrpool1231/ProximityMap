@@ -164,7 +164,7 @@ class TestBranding:
 # ---------- Claim / checkout user_id ----------
 class TestClaim:
     def test_checkout_stores_user_id(self, admin_session):
-        r = admin_session.post(f"{BASE_URL}/api/payments/checkout", json={"origin_url": BASE_URL, "lookup_key": "geopulse_pro_onetime"}, timeout=20)
+        r = admin_session.post(f"{BASE_URL}/api/payments/checkout", json={"origin_url": BASE_URL, "lookup_key": "geopulse_pro_monthly"}, timeout=20)
         assert r.status_code == 200, r.text
         sid = r.json().get("session_id")
         assert sid

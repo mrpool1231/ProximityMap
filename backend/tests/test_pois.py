@@ -34,21 +34,21 @@ def test_root_service_name():
     r = requests.get(f"{API}/", timeout=30)
     assert r.status_code == 200
     data = r.json()
-    assert data.get("service") == "MapApp API"
+    assert data.get("service") == "ProximityMap API"
 
 
 def test_payments_products_name():
     r = requests.get(f"{API}/payments/products", timeout=30)
     assert r.status_code == 200
     data = r.json()
-    # Locate product 'MapApp Pro'
+    # Locate product 'ProximityMap Pro'
     items = data if isinstance(data, list) else data.get("products", data)
     names = []
     if isinstance(items, list):
         names = [p.get("name") for p in items if isinstance(p, dict)]
     elif isinstance(items, dict):
         names = [v.get("name") for v in items.values() if isinstance(v, dict)]
-    assert "MapApp Pro" in names, f"products response: {data}"
+    assert "ProximityMap Pro" in names, f"products response: {data}"
 
 
 # --- POI validation ---

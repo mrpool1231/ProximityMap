@@ -79,7 +79,7 @@ export default function AIAnalyst({ context, pro, onUpgrade }) {
             <Bot size={14} className="text-sky-300" />
           </div>
           <div>
-            <div className="font-heading text-sm font-semibold">MapApp Analyst</div>
+            <div className="font-heading text-sm font-semibold">ProximityMap Analyst</div>
             <div className="text-[10px] font-mono uppercase tracking-widest text-slate-500">{pro ? "ChatGPT · unlimited" : `ChatGPT · ${freeLeft} free left`}</div>
           </div>
         </div>

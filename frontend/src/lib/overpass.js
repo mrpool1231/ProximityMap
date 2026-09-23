@@ -10,11 +10,11 @@ const OVERPASS_ENDPOINTS = [
 
 // nwr = nodes + ways + relations (multipolygon parks/campuses are relations)
 const CATEGORY_FILTERS = {
-  parks: ['["leisure"="park"]', '["leisure"="nature_reserve"]'],
-  schools: ['["amenity"="school"]', '["amenity"="university"]', '["amenity"="college"]'],
+  parks: ['["leisure"~"^(park|nature_reserve|recreation_ground|common)$"]'],
+  schools: ['["amenity"~"^(school|university|college)$"]'],
   daycares: ['["amenity"~"^(kindergarten|childcare)$"]'],
   gas_stations: ['["amenity"="fuel"]'],
-  hospitals: ['["amenity"~"^(hospital|clinic)$"]'],
+  hospitals: ['["amenity"~"^(hospital|clinic)$"]', '["healthcare"~"^(hospital|clinic)$"]'],
   restaurants: ['["amenity"="restaurant"]'],
   supermarkets: ['["shop"="supermarket"]'],
   ev_chargers: ['["amenity"="charging_station"]'],
@@ -58,7 +58,11 @@ async function _postOverpass(query, signal) {
 
 export function normalizeElements(elements, category, lat, lon, radius = Infinity) {
   const out = [];
+  const seenIds = new Set();
   for (const el of elements || []) {
+    const elementId = `${el.type}/${el.id}`;
+    if (seenIds.has(elementId)) continue;
+    seenIds.add(elementId);
     const plat = el.type === "node" ? el.lat : el.center?.lat;
     const plon = el.type === "node" ? el.lon : el.center?.lon;
     if (plat == null || plon == null) continue;
@@ -66,7 +70,7 @@ export function normalizeElements(elements, category, lat, lon, radius = Infinit
     if (distance_m > radius) continue; // ways touching the radius edge: keep centroid inside
     const tags = el.tags || {};
     out.push({
-      id: `${el.type}/${el.id}`,
+      id: elementId,
       lat: plat,
       lon: plon,
       name: tags.name || tags.brand || tags.operator || `Unnamed ${category.replace("_", " ").replace(/s$/, "")}`,

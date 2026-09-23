@@ -1,7 +1,8 @@
-import { LAYER_BY_ID } from "@/lib/mapConfig";
+import { LAYER_BY_ID, POI_LAYERS, CONCEPT_LAYERS } from "@/lib/mapConfig";
 
 export default function Legend({ visibility, counts, customLayers }) {
-  const active = Object.entries(visibility).filter(([, v]) => v).map(([k]) => k);
+  const mapLayerIds = new Set([...POI_LAYERS, ...CONCEPT_LAYERS].map((l) => l.id));
+  const active = Object.entries(visibility).filter(([k, v]) => v && mapLayerIds.has(k)).map(([k]) => k);
   if (active.length === 0 && (!customLayers || customLayers.filter((c) => c.visible).length === 0)) return null;
   return (
     <div

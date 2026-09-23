@@ -40,7 +40,7 @@ export default function ResetPassword() {
     <div className="flex min-h-screen items-center justify-center bg-[#0b0f17] px-4" data-testid="reset-password-page">
       <div className="w-full max-w-sm rounded-2xl border border-white/10 bg-slate-900/60 p-8 backdrop-blur-xl">
         <div className="mb-4 flex items-center gap-2 text-[10px] font-mono uppercase tracking-[0.2em] text-slate-500">
-          <Compass size={12} /> MapApp
+          <Compass size={12} /> ProximityMap
         </div>
         {done ? (
           <div className="text-center" data-testid="reset-done">
@@ -52,7 +52,7 @@ export default function ResetPassword() {
           <div data-testid="reset-missing-token">
             <h1 className="font-heading text-xl font-semibold">Invalid reset link</h1>
             <p className="mt-2 text-sm text-slate-400">This link is missing its token. Request a new one from the sign-in dialog.</p>
-            <Button asChild className="mt-4 w-full bg-sky-500 text-slate-950 hover:bg-sky-400"><Link to="/">Back to MapApp</Link></Button>
+            <Button asChild className="mt-4 w-full bg-sky-500 text-slate-950 hover:bg-sky-400"><Link to="/">Back to ProximityMap</Link></Button>
           </div>
         ) : (
           <form onSubmit={submit} className="space-y-3" data-testid="reset-form">

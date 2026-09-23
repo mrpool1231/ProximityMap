@@ -26,11 +26,12 @@ def test_products_lists_geopulse_pro(s):
     assert r.status_code == 200, r.text
     products = r.json().get("products", [])
     assert len(products) >= 1
-    pro = next((p for p in products if p["lookup_key"] == "geopulse_pro_onetime"), None)
-    assert pro is not None, f"geopulse_pro_onetime missing: {products}"
-    assert pro["amount"] == 9.0
+    pro = next((p for p in products if p["lookup_key"] == "geopulse_pro_monthly"), None)
+    assert pro is not None, f"geopulse_pro_monthly missing: {products}"
+    assert pro["amount"] == 4.99
     assert pro["currency"] == "usd"
-    assert pro.get("recurring") is False
+    assert pro.get("recurring") is True
+    assert pro.get("interval") == "month"
 
 
 def test_checkout_unknown_lookup_key_returns_400(s):
@@ -42,7 +43,7 @@ def test_checkout_unknown_lookup_key_returns_400(s):
 
 def test_checkout_creates_session_and_status_initiated(s):
     r = s.post(f"{BASE_URL}/api/payments/checkout",
-               json={"lookup_key": "geopulse_pro_onetime", "origin_url": BASE_URL},
+               json={"lookup_key": "geopulse_pro_monthly", "origin_url": BASE_URL},
                timeout=30)
     assert r.status_code == 200, r.text
     body = r.json()
@@ -56,7 +57,7 @@ def test_checkout_creates_session_and_status_initiated(s):
     assert sj["session_id"] == sid
     assert sj["status"] == "initiated"
     assert sj["payment_status"] == "pending"
-    assert sj["lookup_key"] == "geopulse_pro_onetime"
+    assert sj["lookup_key"] == "geopulse_pro_monthly"
 
 
 def test_status_unknown_returns_404(s):

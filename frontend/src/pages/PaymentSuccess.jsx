@@ -51,12 +51,12 @@ export default function PaymentSuccess() {
     <div className="flex min-h-screen items-center justify-center bg-[#0b0f17] px-4" data-testid="payment-success-page">
       <div className="w-full max-w-md rounded-2xl border border-white/10 bg-slate-900/60 p-8 text-center backdrop-blur-xl">
         <div className="mb-4 flex items-center justify-center gap-2 text-[10px] font-mono uppercase tracking-[0.2em] text-slate-500">
-          <Compass size={12} /> MapApp
+          <Compass size={12} /> ProximityMap
         </div>
         {state === "checking" && (
           <>
             <Loader2 size={36} className="mx-auto mb-4 animate-spin text-sky-400" />
-            <h1 className="font-heading text-xl font-semibold">Confirming your payment…</h1>
+            <h1 className="font-heading text-xl font-semibold">Activating your subscription…</h1>
             <p className="mt-2 text-sm text-slate-400">This usually takes a few seconds.</p>
           </>
         )}
@@ -64,7 +64,7 @@ export default function PaymentSuccess() {
           <>
             <CheckCircle2 size={40} className="mx-auto mb-4 text-emerald-400" />
             <h1 className="font-heading text-2xl font-bold" data-testid="payment-paid-title">You're Pro now</h1>
-            <p className="mt-2 text-sm text-slate-400">PDF briefs and share links are unlocked on this device.</p>
+            <p className="mt-2 text-sm text-slate-400">Your $4.99/month Pro subscription is active.</p>
           </>
         )}
         {state === "pending" && (

@@ -120,7 +120,7 @@ export default function AuthDialog({ open, onOpenChange, defaultTab = "login" })
     <Dialog open={open} onOpenChange={(v) => { onOpenChange(v); if (!v) setForgot(false); }}>
       <DialogContent className="max-w-sm border-white/10 bg-[#0b0f17] text-slate-100" data-testid="auth-dialog">
         <DialogHeader>
-          <DialogTitle className="font-heading text-xl">{forgot ? "Reset your password" : "Your MapApp account"}</DialogTitle>
+          <DialogTitle className="font-heading text-xl">{forgot ? "Reset your password" : "Your ProximityMap account"}</DialogTitle>
           <DialogDescription className="text-slate-400">
             Sign in so your Pro pass and brief branding follow you to any device. By continuing you accept our{" "}
             <a href="/legal/terms" target="_blank" rel="noreferrer" className="underline hover:text-slate-200">Terms</a> and{" "}

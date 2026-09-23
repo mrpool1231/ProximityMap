@@ -23,6 +23,16 @@ function makePoiIcon(color, IconComp) {
   return L.divIcon({ html, className: "", iconSize: [24, 24], iconAnchor: [12, 12] });
 }
 
+
+function escapeHtml(value) {
+  return String(value ?? "")
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;")
+    .replace(/'/g, "&#039;");
+}
+
 function makePinIcon() {
   const html = `<div class="pin-marker-wrap"><span class="pin-pulse"></span><span class="pin-marker-dot"></span></div>`;
   return L.divIcon({ html, className: "", iconSize: [28, 28], iconAnchor: [14, 14] });
@@ -174,9 +184,9 @@ export default function MapView({
               }
               onEachFeature={(feature, layer) => {
                 const props = feature.properties || {};
-                const html = `<div class="text-sm"><div class="font-semibold text-sky-400">${cl.name}</div>${Object.entries(props)
+                const html = `<div class="text-sm"><div class="font-semibold text-sky-400">${escapeHtml(cl.name)}</div>${Object.entries(props)
                   .slice(0, 6)
-                  .map(([k, v]) => `<div><span class="text-slate-400">${k}:</span> ${v}</div>`)
+                  .map(([k, v]) => `<div><span class="text-slate-400">${escapeHtml(k)}:</span> ${escapeHtml(v)}</div>`)
                   .join("")}</div>`;
                 layer.bindPopup(html);
               }}

@@ -137,6 +137,10 @@ export async function createCheckout(lookup_key) {
   const { data } = await api.post("/payments/checkout", { lookup_key, origin_url: window.location.origin });
   return data;
 }
+export async function createBillingPortal() {
+  const { data } = await api.post("/payments/portal", { origin_url: window.location.origin });
+  return data;
+}
 export async function paymentStatus(sessionId) {
   const { data } = await api.get(`/payments/status/${sessionId}`);
   return data;

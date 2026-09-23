@@ -58,6 +58,8 @@ def public_user(u: dict) -> dict:
         "name": u.get("name") or u["email"].split("@")[0],
         "role": u.get("role", "user"),
         "is_pro": bool(u.get("is_pro")),
+        "pro_subscription_id": u.get("pro_subscription_id"),
+        "pro_subscription_status": u.get("pro_subscription_status"),
         "branding": u.get("branding") or {},
     }
 
@@ -231,10 +233,20 @@ async def claim_license(payload: ClaimIn, user: dict = Depends(get_current_user)
     tx = await db.payment_transactions.find_one({"session_id": payload.session_id})
     if not tx or tx.get("payment_status") != "paid":
         raise HTTPException(400, "This purchase is not confirmed as paid")
+    # Preserve legacy lifetime one-time purchases, while requiring an active
+    # subscription for new monthly Pro purchases.
+    if tx.get("stripe_subscription_id") and tx.get("subscription_status") not in {"active", "trialing"}:
+        raise HTTPException(400, "This Pro subscription is not active")
     if tx.get("user_id") and tx["user_id"] != user["id"]:
         raise HTTPException(409, "This purchase already belongs to another account")
     await db.payment_transactions.update_one({"session_id": payload.session_id}, {"$set": {"user_id": user["id"]}})
-    await db.users.update_one({"id": user["id"]}, {"$set": {"is_pro": True, "pro_session_id": payload.session_id}})
+    fields = {"is_pro": True, "pro_session_id": payload.session_id}
+    if tx.get("stripe_subscription_id"):
+        fields.update({
+            "pro_subscription_id": tx["stripe_subscription_id"],
+            "pro_subscription_status": tx.get("subscription_status"),
+        })
+    await db.users.update_one({"id": user["id"]}, {"$set": fields})
     return {"is_pro": True}
 
 

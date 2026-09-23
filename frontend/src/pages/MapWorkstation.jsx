@@ -59,6 +59,9 @@ export default function MapWorkstation() {
   const [dataB, setDataB] = useState(null);
   const [loadingB, setLoadingB] = useState(false);
   const [retryTick, setRetryTick] = useState(0);
+  const [locating, setLocating] = useState(false);
+  const [mobileLayersOpen, setMobileLayersOpen] = useState(false);
+  const [mobileAnalysisOpen, setMobileAnalysisOpen] = useState(false);
 
   const [visibility, setVisibility] = useState(initialVisibility);
   const [opacity, setOpacity] = useState(initialOpacity);
@@ -191,7 +194,7 @@ export default function MapWorkstation() {
 
   const onToggle = useCallback((id, v) => setVisibility((prev) => ({ ...prev, [id]: v })), []);
   const onOpacityChange = useCallback((id, v) => setOpacity((prev) => ({ ...prev, [id]: v })), []);
-  const selectAll = () => setVisibility(Object.fromEntries(ALL_LAYERS.map((l) => [l.id, true])));
+  const selectAll = () => setVisibility(Object.fromEntries(ALL_LAYERS.map((l) => [l.id, l.id === "traffic" ? trafficCfg.enabled : true])));
   const hideAll = () => setVisibility(Object.fromEntries(ALL_LAYERS.map((l) => [l.id, false])));
 
   const placePin = (coords, zoom) => {
@@ -212,6 +215,33 @@ export default function MapWorkstation() {
   const onSearchSelect = (coords, label) => {
     placePin(coords, 15);
     toast.success("Location set", { description: label?.split(",").slice(0, 2).join(",") });
+  };
+
+  const onUseLocation = () => {
+    if (!navigator.geolocation) {
+      toast.error("Location is not supported by this browser");
+      return;
+    }
+    setLocating(true);
+    navigator.geolocation.getCurrentPosition(
+      ({ coords }) => {
+        const next = [coords.latitude, coords.longitude];
+        placePin(next, 16);
+        setClickPinMode(false);
+        toast.success("Current location set", { description: `${next[0].toFixed(4)}, ${next[1].toFixed(4)}` });
+        setLocating(false);
+      },
+      (error) => {
+        const message = error.code === error.PERMISSION_DENIED
+          ? "Location permission was denied"
+          : error.code === error.POSITION_UNAVAILABLE
+            ? "Your location is currently unavailable"
+            : "Could not determine your location";
+        toast.error(message);
+        setLocating(false);
+      },
+      { enableHighAccuracy: true, timeout: 12000, maximumAge: 60000 }
+    );
   };
 
   const setOutline = (target, latlngs, zoom) => {
@@ -335,9 +365,11 @@ export default function MapWorkstation() {
         onPrint={onPrint}
         sharing={sharing}
         isPro={pro}
-        onUpgrade={() => setUpgrade({ reason: "Unlock MapApp Pro" })}
+        onUpgrade={() => setUpgrade({ reason: "Unlock ProximityMap Pro" })}
         onSignIn={() => setAuthOpen(true)}
         onBranding={() => setBrandingOpen(true)}
+        onToggleLayers={() => setMobileLayersOpen((v) => !v)}
+        onToggleAnalysis={() => setMobileAnalysisOpen((v) => !v)}
       />
       <div className="flex flex-1 min-h-0">
         <LayerSidebar
@@ -354,6 +386,8 @@ export default function MapWorkstation() {
           onDeleteCustom={onDeleteCustom}
           onCustomOpacity={onCustomOpacity}
           trafficEnabled={trafficCfg.enabled}
+          mobileOpen={mobileLayersOpen}
+          onMobileClose={() => setMobileLayersOpen(false)}
         />
         <div className={`relative flex-1 min-w-0 ${capturing ? "map-capture-mode" : ""}`}>
           <MapView
@@ -398,6 +432,11 @@ export default function MapWorkstation() {
           propertyTools={propertyTools}
           compare={{ propertyB, dataB, loadingB }}
           onRetry={() => setRetryTick((t) => t + 1)}
+          onUseLocation={onUseLocation}
+          locating={locating}
+          visibility={visibility}
+          mobileOpen={mobileAnalysisOpen}
+          onMobileClose={() => setMobileAnalysisOpen(false)}
         />
       </div>
       <UploadModal open={uploadOpen} onOpenChange={setUploadOpen} onCreated={onCreatedCustom} />

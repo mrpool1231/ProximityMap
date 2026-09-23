@@ -35,7 +35,7 @@ export default function UpgradeDialog({ open, onOpenChange, reason, onBeforeChec
           </div>
           <DialogTitle className="font-heading text-xl">{reason || "This is a Pro feature"}</DialogTitle>
           <DialogDescription className="text-slate-400">
-            Unlock MapApp Pro once and keep it forever on this device — no account needed.
+            Unlock ProximityMap Pro for $4.99/month. Cancel anytime from your Stripe billing portal.
           </DialogDescription>
         </DialogHeader>
 
@@ -43,15 +43,15 @@ export default function UpgradeDialog({ open, onOpenChange, reason, onBeforeChec
           <div className="flex items-baseline justify-between">
             <div className="flex items-center gap-2">
               <Sparkles size={14} className="text-amber-300" />
-              <span className="font-heading font-semibold">{product?.name || "MapApp Pro"}</span>
+              <span className="font-heading font-semibold">{product?.name || "ProximityMap Pro"}</span>
             </div>
             <div className="font-mono text-2xl font-bold text-amber-300" data-testid="pro-price">
-              {product ? `$${product.amount.toFixed(0)}` : "…"}
-              <span className="ml-1 text-[10px] font-normal uppercase tracking-widest text-slate-400">one-time</span>
+              {product ? `$${product.amount.toFixed(2)}` : "…"}
+              <span className="ml-1 text-[10px] font-normal uppercase tracking-widest text-slate-400">/ month</span>
             </div>
           </div>
           <ul className="mt-3 space-y-1.5">
-            {(product?.features || ["Print-ready PDF property briefs", "Shareable report links", "Lifetime access"]).map((f) => (
+            {(product?.features || ["Print-ready PDF property briefs", "Shareable report links", "Unlimited AI Analyst questions"]).map((f) => (
               <li key={f} className="flex items-center gap-2 text-sm text-slate-200">
                 <Check size={13} className="text-emerald-400" /> {f}
               </li>
@@ -65,11 +65,11 @@ export default function UpgradeDialog({ open, onOpenChange, reason, onBeforeChec
           </Button>
           <Button onClick={checkout} disabled={busy || !product} className="bg-amber-500 text-slate-950 hover:bg-amber-400" data-testid="upgrade-checkout-button">
             {busy ? <Loader2 size={14} className="mr-2 animate-spin" /> : <Sparkles size={14} className="mr-2" />}
-            Unlock Pro
+            Start Pro
           </Button>
         </div>
         <p className="text-center text-[10px] text-slate-500">
-          Secure checkout by Stripe · Test card 4242 4242 4242 4242 · By purchasing you agree to our{" "}
+          Secure checkout by Stripe · Test card 4242 4242 4242 4242 · By subscribing you agree to our{" "}
           <a href="/legal/terms" target="_blank" rel="noreferrer" className="underline hover:text-slate-300" data-testid="upgrade-terms-link">Terms</a> and{" "}
           <a href="/legal/refunds" target="_blank" rel="noreferrer" className="underline hover:text-slate-300" data-testid="upgrade-refunds-link">Refund policy</a>
         </p>

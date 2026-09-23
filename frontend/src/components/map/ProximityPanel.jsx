@@ -5,7 +5,7 @@ import { Slider } from "@/components/ui/slider";
 import { Badge } from "@/components/ui/badge";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Separator } from "@/components/ui/separator";
-import { MapPin, Search, Crosshair, Loader2, Target, ChevronRight, CloudRain, Wind, Mountain, AlertTriangle } from "lucide-react";
+import { MapPin, Search, Crosshair, Loader2, Target, ChevronRight, CloudRain, Wind, Mountain, AlertTriangle, LocateFixed, X } from "lucide-react";
 import { geocode } from "@/lib/api";
 import { LAYER_BY_ID } from "@/lib/mapConfig";
 import PropertyTools from "@/components/map/PropertyTools";
@@ -13,8 +13,26 @@ import CompareScorecard from "@/components/map/CompareScorecard";
 import { toast } from "sonner";
 
 function fmtDist(m) {
-  return m < 1000 ? `${Math.round(m)} m` : `${(m / 1000).toFixed(2)} km`;
+  if (m < 1609.344) {
+    const ft = m * 3.28084;
+    return `${Math.round(ft).toLocaleString()} ft`;
+  }
+  return `${(m / 1609.344).toFixed(2)} mi`;
 }
+
+function fmtRadius(m) {
+  if (m < 1609.344) return `${Math.round(m * 3.28084).toLocaleString()} ft`;
+  return `${(m / 1609.344).toFixed(2)} mi`;
+}
+
+const RADIUS_PRESETS = [
+  { label: "500 ft", value: 152.4 },
+  { label: "1,000 ft", value: 304.8 },
+  { label: "2,000 ft", value: 609.6 },
+  { label: "¼ mi", value: 402.336 },
+  { label: "½ mi", value: 804.672 },
+  { label: "1 mi", value: 1609.344 },
+];
 
 function EnvStat({ icon: Icon, label, value, unit, color }) {
   return (
@@ -45,6 +63,11 @@ export default function ProximityPanel({
   propertyTools,
   compare,
   onRetry,
+  onUseLocation,
+  locating,
+  visibility,
+  mobileOpen = false,
+  onMobileClose,
 }) {
   const [q, setQ] = useState("");
   const [results, setResults] = useState([]);
@@ -70,13 +93,18 @@ export default function ProximityPanel({
 
   return (
     <aside
-      className="flex h-full w-96 shrink-0 flex-col border-l border-white/5 bg-[#0b0f17]/95 backdrop-blur-xl"
+      className={mobileOpen
+        ? "absolute inset-y-0 right-0 z-30 flex h-full w-[min(92vw,24rem)] shrink-0 flex-col border-l border-white/5 bg-[#0b0f17]/98 shadow-2xl backdrop-blur-xl md:relative md:w-96"
+        : "hidden h-full w-96 shrink-0 flex-col border-l border-white/5 bg-[#0b0f17]/95 backdrop-blur-xl md:flex"}
       data-testid="proximity-panel"
     >
       <div className="border-b border-white/5 px-4 py-3.5">
         <div className="flex items-center gap-2">
           <Target size={16} className="text-amber-400" />
           <h2 className="font-heading text-sm font-semibold tracking-wide">Proximity Analysis</h2>
+          <Button size="icon" variant="ghost" className="ml-auto h-7 w-7 text-slate-400 md:hidden" onClick={onMobileClose} aria-label="Close analysis">
+            <X size={14} />
+          </Button>
         </div>
         <p className="mt-1 text-xs text-slate-500">Drop a pin or search an address to profile everything nearby.</p>
       </div>
@@ -124,19 +152,31 @@ export default function ProximityPanel({
           </div>
         )}
 
-        <Button
-          variant={clickPinMode ? "default" : "outline"}
-          onClick={() => setClickPinMode(!clickPinMode)}
-          className={
-            clickPinMode
-              ? "h-9 bg-amber-500 text-slate-950 hover:bg-amber-400"
-              : "h-9 border-white/10 bg-transparent text-slate-200 hover:border-amber-400/50 hover:bg-amber-400/5 hover:text-amber-300"
-          }
-          data-testid="drop-pin-button"
-        >
-          <Crosshair size={14} className="mr-2" />
-          {clickPinMode ? "Click map to drop pin…" : "Drop pin on map"}
-        </Button>
+        <div className="grid grid-cols-2 gap-2">
+          <Button
+            variant={clickPinMode ? "default" : "outline"}
+            onClick={() => setClickPinMode(!clickPinMode)}
+            className={
+              clickPinMode
+                ? "h-9 bg-amber-500 text-slate-950 hover:bg-amber-400"
+                : "h-9 border-white/10 bg-transparent text-slate-200 hover:border-amber-400/50 hover:bg-amber-400/5 hover:text-amber-300"
+            }
+            data-testid="drop-pin-button"
+          >
+            <Crosshair size={14} className="mr-2" />
+            {clickPinMode ? "Drop pin…" : "Drop pin"}
+          </Button>
+          <Button
+            variant="outline"
+            onClick={onUseLocation}
+            disabled={locating}
+            className="h-9 border-white/10 bg-transparent text-slate-200 hover:border-sky-400/50 hover:bg-sky-400/5 hover:text-sky-300"
+            data-testid="use-location-button"
+          >
+            {locating ? <Loader2 size={14} className="mr-2 animate-spin" /> : <LocateFixed size={14} className="mr-2" />}
+            {locating ? "Locating…" : "My location"}
+          </Button>
+        </div>
 
         <PropertyTools {...propertyTools} />
       </div>
@@ -145,20 +185,36 @@ export default function ProximityPanel({
         <div className="mb-2 flex items-center justify-between">
           <span className="text-[10px] font-mono uppercase tracking-widest text-slate-400">Buffer radius</span>
           <span className="font-mono text-sm font-semibold text-sky-400" data-testid="radius-value">
-            {radius >= 1000 ? `${(radius / 1000).toFixed(2)} km` : `${radius} m`}
+            {fmtRadius(radius)}
           </span>
         </div>
         <Slider
           value={[radius]}
           min={100}
-          max={10000}
-          step={100}
+          max={16093}
+          step={10}
           onValueChange={(v) => onRadiusChange(v[0])}
           data-testid="radius-slider"
         />
         <div className="mt-1 flex justify-between text-[10px] font-mono text-slate-600">
-          <span>100 m</span>
-          <span>10 km</span>
+          <span>328 ft</span>
+          <span>10 mi</span>
+        </div>
+        <div className="mt-3 grid grid-cols-3 gap-1.5">
+          {RADIUS_PRESETS.map((preset) => (
+            <Button
+              key={preset.label}
+              type="button"
+              variant="outline"
+              size="sm"
+              onClick={() => onRadiusChange(preset.value)}
+              className={`h-7 border-white/10 bg-slate-900/60 px-2 text-[10px] font-mono ${
+                Math.abs(radius - preset.value) < 1 ? "border-sky-400/50 bg-sky-400/10 text-sky-300" : "text-slate-400 hover:border-sky-400/40 hover:text-sky-300"
+              }`}
+            >
+              {preset.label}
+            </Button>
+          ))}
         </div>
       </div>
 
@@ -189,30 +245,38 @@ export default function ProximityPanel({
                 </div>
               </div>
 
-              <div className="space-y-2">
-                <div className="text-[10px] font-mono uppercase tracking-widest text-slate-400">Environmental</div>
-                <EnvStat
-                  icon={CloudRain}
-                  label="Temperature"
-                  value={currentWeather?.temperature_2m}
-                  unit="°C"
-                  color="#8B5CF6"
-                />
-                <EnvStat
-                  icon={Wind}
-                  label="US AQI"
-                  value={currentAqi?.us_aqi}
-                  unit=""
-                  color="#06B6D4"
-                />
-                <EnvStat
-                  icon={Mountain}
-                  label="Elevation"
-                  value={elevation != null ? Math.round(elevation) : null}
-                  unit="m"
-                  color="#84CC16"
-                />
-              </div>
+              {(visibility?.weather || visibility?.air_quality || visibility?.elevation) && (
+                <div className="space-y-2">
+                  <div className="text-[10px] font-mono uppercase tracking-widest text-slate-400">Environmental data</div>
+                  {visibility?.weather && (
+                    <EnvStat
+                      icon={CloudRain}
+                      label="Temperature"
+                      value={currentWeather?.temperature_2m}
+                      unit="°C"
+                      color="#8B5CF6"
+                    />
+                  )}
+                  {visibility?.air_quality && (
+                    <EnvStat
+                      icon={Wind}
+                      label="US AQI"
+                      value={currentAqi?.us_aqi}
+                      unit=""
+                      color="#06B6D4"
+                    />
+                  )}
+                  {visibility?.elevation && (
+                    <EnvStat
+                      icon={Mountain}
+                      label="Elevation"
+                      value={elevation != null ? Math.round(elevation) : null}
+                      unit="m"
+                      color="#84CC16"
+                    />
+                  )}
+                </div>
+              )}
 
               {compare?.propertyB && proximityData && <CompareScorecard dataA={proximityData} dataB={compare.dataB} loadingB={compare.loadingB} />}
 

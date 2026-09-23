@@ -10,7 +10,6 @@ import {
   CloudRain,
   Wind,
   Mountain,
-  Users,
   Car,
 } from "lucide-react";
 
@@ -26,17 +25,16 @@ export const POI_LAYERS = [
   { id: "ev_chargers", label: "EV Chargers", color: "#22D3EE", icon: Zap, group: "Amenities" },
 ];
 
-// Point-of-interest-style environmental layers, backed by Open-Meteo
+// Environmental data panels backed by Open-Meteo. These are not map overlays.
 export const ENV_LAYERS = [
   { id: "weather", label: "Live Weather", color: "#8B5CF6", icon: CloudRain, group: "Environment" },
   { id: "air_quality", label: "Air Quality (AQI)", color: "#06B6D4", icon: Wind, group: "Environment" },
   { id: "elevation", label: "Elevation", color: "#84CC16", icon: Mountain, group: "Environment" },
 ];
 
-// Placeholder / conceptual overlays not backed by a live API
+// Live map overlays backed by a provider. Keep only overlays that are actually rendered.
 export const CONCEPT_LAYERS = [
-  { id: "population", label: "Population Density", color: "#EC4899", icon: Users, group: "Urban", note: "Heat blur visualisation" },
-  { id: "traffic", label: "Traffic Congestion", color: "#F97316", icon: Car, group: "Urban", note: "Live flow · TomTom" },
+  { id: "traffic", label: "Traffic Congestion", color: "#F97316", icon: Car, group: "Traffic", note: "Live flow · TomTom" },
 ];
 
 export const LAYER_BY_ID = Object.fromEntries(

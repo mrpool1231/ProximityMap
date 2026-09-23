@@ -4,9 +4,9 @@ import { Switch } from "@/components/ui/switch";
 import { Slider } from "@/components/ui/slider";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { ChevronDown, ChevronRight, Upload, Trash2, Layers } from "lucide-react";
+import { ChevronDown, ChevronRight, Upload, Trash2, Layers, X } from "lucide-react";
 
-function LayerRow({ layer, visible, opacity, count, onToggle, onOpacity, warning }) {
+function LayerRow({ layer, visible, opacity, count, onToggle, onOpacity, warning, showOpacity = true, disabled = false }) {
   const Icon = layer.icon;
   return (
     <div className="group flex flex-col gap-2 rounded-lg border border-white/5 bg-slate-900/50 px-3 py-2.5 transition-colors hover:border-white/10">
@@ -31,12 +31,13 @@ function LayerRow({ layer, visible, opacity, count, onToggle, onOpacity, warning
           )}
           <Switch
             checked={visible}
+            disabled={disabled}
             onCheckedChange={onToggle}
             data-testid={`layer-toggle-${layer.id}`}
           />
         </div>
       </div>
-      {visible && (
+      {visible && showOpacity && (
         <div className="flex items-center gap-2 pl-9">
           <span className="w-6 text-[10px] font-mono text-slate-500">{opacity}%</span>
           <Slider
@@ -89,6 +90,8 @@ export default function LayerSidebar({
   onDeleteCustom,
   onCustomOpacity,
   trafficEnabled,
+  mobileOpen = false,
+  onMobileClose,
 }) {
   return (
     <aside
@@ -100,7 +103,10 @@ export default function LayerSidebar({
           <Layers size={16} className="text-sky-400" />
           <h2 className="font-heading text-sm font-semibold tracking-wide">Layer Control</h2>
         </div>
-        <div className="flex gap-1">
+        <div className="flex items-center gap-1">
+          <Button size="icon" variant="ghost" className="h-7 w-7 text-slate-400 md:hidden" onClick={onMobileClose} aria-label="Close layers">
+            <X size={14} />
+          </Button>
           <Button
             size="sm"
             variant="ghost"
@@ -137,7 +143,7 @@ export default function LayerSidebar({
           ))}
         </Group>
 
-        <Group title="Environment">
+        <Group title="Environmental data">
           {ENV_LAYERS.map((l) => (
             <LayerRow
               key={l.id}
@@ -146,11 +152,12 @@ export default function LayerSidebar({
               opacity={opacity[l.id] ?? 85}
               onToggle={(v) => onToggle(l.id, v)}
               onOpacity={(v) => onOpacityChange(l.id, v)}
+              showOpacity={false}
             />
           ))}
         </Group>
 
-        <Group title="Urban" defaultOpen={false}>
+        <Group title="Traffic" defaultOpen={false}>
           {CONCEPT_LAYERS.map((l) => (
             <LayerRow
               key={l.id}
@@ -159,7 +166,8 @@ export default function LayerSidebar({
               opacity={opacity[l.id] ?? 60}
               onToggle={(v) => onToggle(l.id, v)}
               onOpacity={(v) => onOpacityChange(l.id, v)}
-              warning={l.id === "traffic" && !trafficEnabled ? "Live traffic needs a TomTom key — set TOMTOM_API_KEY on the backend." : undefined}
+              warning={!trafficEnabled ? "Live traffic is unavailable until a TomTom key is configured." : undefined}
+              disabled={l.id === "traffic" && !trafficEnabled}
             />
           ))}
         </Group>
