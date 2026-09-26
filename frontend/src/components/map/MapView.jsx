@@ -1,5 +1,5 @@
 import { MapContainer, TileLayer, Marker, Circle, Polygon, Polyline, CircleMarker, GeoJSON, useMap, useMapEvents } from "react-leaflet";
-import { useEffect, useMemo, useRef } from "react";
+import { memo, useCallback, useEffect, useMemo, useRef } from "react";
 import L from "leaflet";
 import { BASEMAPS, LAYER_BY_ID } from "@/lib/mapConfig";
 import { propertyBuffer } from "@/lib/geo";
@@ -80,10 +80,23 @@ export function BufferOverlay({ pin, radius, property, variant = "A" }) {
   return pin && radius > 0 ? <Circle center={pin} radius={radius} pathOptions={BUFFER_STYLE} /> : null;
 }
 
+const PoiMarker = memo(function PoiMarker({ feature, layerId, meta, opacity, icon, onPoiClick }) {
+  const handleClick = useCallback(() => onPoiClick?.({ ...feature, layer: meta }), [feature, meta, onPoiClick]);
+  return (
+    <Marker
+      position={[feature.lat, feature.lon]}
+      icon={icon}
+      opacity={opacity}
+      eventHandlers={{ click: handleClick }}
+    />
+  );
+});
+
 export default function MapView({
   basemap = "dark",
   view,
   pin,
+  pins = [],
   onMapClick,
   clickPinMode,
   drawPoints,
@@ -136,8 +149,13 @@ export default function MapView({
       <Recenter center={view.center} zoom={view.zoom} />
       <MapClickHandler enabled={clickPinMode || drawing} onClick={onMapClick} />
 
-      {pin && <Marker position={pin} icon={pinIcon} />}
-      <BufferOverlay pin={pin} radius={radius} property={property} />
+      {(pins.length ? pins : (pin ? [{ id: "active", coords: pin }] : [])).map((p) => (
+        <Marker key={p.id} position={p.coords} icon={pinIcon} />
+      ))}
+      {(pins.length ? pins : (pin ? [{ id: "active", coords: pin }] : [])).map((p) => (
+        <BufferOverlay key={`buffer-${p.id}`} pin={p.coords} radius={radius} />
+      ))}
+      {!pins.length && <BufferOverlay pin={pin} radius={radius} property={property} />}
       {propertyB && <BufferOverlay radius={radius} property={propertyB} variant="B" />}
 
       {drawing && drawPoints.length > 0 && (
@@ -155,13 +173,16 @@ export default function MapView({
         if (!meta) return null;
         const IconComp = meta.icon || MapPin;
         const opacity = (layerOpacity[lid] ?? 100) / 100;
+        const icon = getIcon(lid, meta.color, IconComp);
         return data.features.map((f) => (
-          <Marker
+          <PoiMarker
             key={`${lid}-${f.id}`}
-            position={[f.lat, f.lon]}
-            icon={getIcon(lid, meta.color, IconComp)}
+            feature={f}
+            layerId={lid}
+            meta={meta}
+            icon={icon}
             opacity={opacity}
-            eventHandlers={{ click: () => onPoiClick?.({ ...f, layer: meta }) }}
+            onPoiClick={onPoiClick}
           />
         ));
       })}

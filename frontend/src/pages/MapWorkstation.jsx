@@ -1,15 +1,18 @@
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { lazy, Suspense, useCallback, useEffect, useMemo, useState } from "react";
 import MapView from "@/components/map/MapView";
 import LayerSidebar from "@/components/map/LayerSidebar";
 import ProximityPanel from "@/components/map/ProximityPanel";
 import TopBar from "@/components/map/TopBar";
 import Legend from "@/components/map/Legend";
-import UploadModal from "@/components/map/UploadModal";
-import PrintReport from "@/components/map/PrintReport";
 import UpgradeDialog from "@/components/map/UpgradeDialog";
-import AuthDialog from "@/components/map/AuthDialog";
-import BrandingDialog from "@/components/map/BrandingDialog";
-import AIAnalyst from "@/components/map/AIAnalyst";
+
+// Load secondary tools only when the workstation needs them. This keeps the
+// initial map bundle smaller and lets the map/UI render before these features.
+const UploadModal = lazy(() => import("@/components/map/UploadModal"));
+const PrintReport = lazy(() => import("@/components/map/PrintReport"));
+const AuthDialog = lazy(() => import("@/components/map/AuthDialog"));
+const BrandingDialog = lazy(() => import("@/components/map/BrandingDialog"));
+const AIAnalyst = lazy(() => import("@/components/map/AIAnalyst"));
 import { buildAIContext } from "@/lib/ai";
 import { useAuth } from "@/context/AuthContext";
 import { DEFAULT_CENTER, DEFAULT_ZOOM, POI_LAYERS, ENV_LAYERS, CONCEPT_LAYERS } from "@/lib/mapConfig";
@@ -36,10 +39,12 @@ const ALL_LAYERS = [...POI_LAYERS, ...ENV_LAYERS, ...CONCEPT_LAYERS];
 const initialVisibility = () => {
   const v = {};
   ALL_LAYERS.forEach((l) => {
-    v[l.id] = ["parks", "schools", "gas_stations"].includes(l.id);
+    v[l.id] = false;
   });
   return v;
 };
+
+const FREE_RADIUS_METERS = 152.4; // 500 ft
 
 const initialOpacity = () => {
   const o = {};
@@ -51,7 +56,9 @@ export default function MapWorkstation() {
   const [basemap, setBasemap] = useState("dark");
   const [view, setView] = useState({ center: DEFAULT_CENTER, zoom: DEFAULT_ZOOM });
   const [pin, setPin] = useState(null);
-  const [radius, setRadius] = useState(1500);
+  const [pins, setPins] = useState([]);
+  const [activePinId, setActivePinId] = useState(null);
+  const [radius, setRadius] = useState(FREE_RADIUS_METERS);
   const [clickPinMode, setClickPinMode] = useState(false);
   const [property, setProperty] = useState(null); // [[lat, lon], ...]
   const [propertyB, setPropertyB] = useState(null);
@@ -84,6 +91,7 @@ export default function MapWorkstation() {
   const [brandingOpen, setBrandingOpen] = useState(false);
   const { user } = useAuth();
   const pro = isPro || !!user?.is_pro;
+  const effectiveRadius = pro ? radius : FREE_RADIUS_METERS;
 
   const activePoiLayers = useMemo(
     () => POI_LAYERS.filter((l) => visibility[l.id]).map((l) => l.id),
@@ -102,22 +110,34 @@ export default function MapWorkstation() {
       if (s.visible) setVisibility(Object.fromEntries(ALL_LAYERS.map((l) => [l.id, s.visible.includes(l.id)])));
       if (s.opacity) setOpacity((prev) => ({ ...prev, ...s.opacity }));
       if (s.basemap) setBasemap(s.basemap);
-      if (s.radius) setRadius(s.radius);
+      if (s.radius) setRadius(pro ? s.radius : Math.min(s.radius, FREE_RADIUS_METERS));
       setPropertyB(s.propertyB?.length >= 3 ? s.propertyB : null);
-      if (s.property?.length >= 3) applyProperty(s.property, s.zoom || 16);
+      if (s.pins?.length) {
+        setPins(s.pins);
+        const active = s.activePinId && s.pins.find((p) => p.id === s.activePinId) ? s.activePinId : s.pins[0].id;
+        const activePin = s.pins.find((p) => p.id === active);
+        setActivePinId(active);
+        setPin(activePin?.coords || s.pin || null);
+        if (activePin?.coords) setView({ center: activePin.coords, zoom: s.zoom || 15 });
+      } else if (s.property?.length >= 3) applyProperty(s.property, s.zoom || 16);
       else if (s.pin) {
         setPin(s.pin);
         setView({ center: s.pin, zoom: s.zoom || 15 });
       }
     },
-    [applyProperty]
+    [applyProperty, pro]
   );
 
   useEffect(() => {
-    listCustomLayers()
-      .then((rows) => setCustomLayers(rows.map((r) => ({ ...r, visible: true, opacity: 100 }))))
-      .catch(() => {});
-    fetchTrafficConfig().then(setTrafficCfg).catch(() => {});
+    // Let the map paint first. These are secondary data sources and should not
+    // compete with the initial map/UI render.
+    const run = () => {
+      listCustomLayers()
+        .then((rows) => setCustomLayers(rows.map((r) => ({ ...r, visible: true, opacity: 100 }))))
+        .catch(() => {});
+      fetchTrafficConfig().then(setTrafficCfg).catch(() => {});
+    };
+    const idle = window.requestIdleCallback ? window.requestIdleCallback(run, { timeout: 1200 }) : setTimeout(run, 150);
     const license = getLicense();
     if (license) {
       paymentStatus(license)
@@ -143,6 +163,10 @@ export default function MapWorkstation() {
         })
         .catch(() => toast.error("Shared report not found"));
     }
+    return () => {
+      if (window.cancelIdleCallback && typeof idle === "number") window.cancelIdleCallback(idle);
+      else clearTimeout(idle);
+    };
   }, [restoreReport]);
 
   // Fetch POIs whenever pin / radius / property / visible POI categories change
@@ -154,15 +178,18 @@ export default function MapWorkstation() {
     let alive = true;
     setLoadingPois(true);
     const reach = property ? propertyReach(property) : 0;
-    fetchPOIs({ lat: pin[0], lon: pin[1], radius: Math.round(radius + reach), categories: activePoiLayers })
-      .then((d) => alive && setProximityData(property ? applyPropertyDistances(d, property, radius) : d))
-      .catch(() => alive && toast.error("Live place data is unavailable right now"))
-      .finally(() => alive && setLoadingPois(false));
+    const timer = setTimeout(() => {
+      fetchPOIs({ lat: pin[0], lon: pin[1], radius: Math.round(effectiveRadius + reach), categories: activePoiLayers })
+        .then((d) => alive && setProximityData(property ? applyPropertyDistances(d, property, radius) : d))
+        .catch(() => alive && toast.error("Live place data is unavailable right now"))
+        .finally(() => alive && setLoadingPois(false));
+    }, 150);
     return () => {
       alive = false;
+      clearTimeout(timer);
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [pin?.[0], pin?.[1], radius, activePoiLayers.join(","), property, retryTick]);
+  }, [pin?.[0], pin?.[1], effectiveRadius, activePoiLayers.join(","), property, retryTick]);
 
   // Property B (comparison) POIs
   useEffect(() => {
@@ -173,15 +200,18 @@ export default function MapWorkstation() {
     let alive = true;
     setLoadingB(true);
     const [lat, lon] = propertyCentroid(propertyB);
-    fetchPOIs({ lat, lon, radius: Math.round(radius + propertyReach(propertyB)), categories: activePoiLayers })
-      .then((d) => alive && setDataB(applyPropertyDistances(d, propertyB, radius)))
-      .catch(() => alive && toast.error("Property B: live place data unavailable"))
-      .finally(() => alive && setLoadingB(false));
+    const timer = setTimeout(() => {
+      fetchPOIs({ lat, lon, radius: Math.round(effectiveRadius + propertyReach(propertyB)), categories: activePoiLayers })
+        .then((d) => alive && setDataB(applyPropertyDistances(d, propertyB, radius)))
+        .catch(() => alive && toast.error("Property B: live place data unavailable"))
+        .finally(() => alive && setLoadingB(false));
+    }, 150);
     return () => {
       alive = false;
+      clearTimeout(timer);
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [propertyB, radius, activePoiLayers.join(","), retryTick]);
+  }, [propertyB, effectiveRadius, activePoiLayers.join(","), retryTick]);
 
   useEffect(() => {
     if (!pin) return;
@@ -200,11 +230,69 @@ export default function MapWorkstation() {
   const selectAll = () => setVisibility(Object.fromEntries(ALL_LAYERS.map((l) => [l.id, l.id === "traffic" ? trafficCfg.enabled : true])));
   const hideAll = () => setVisibility(Object.fromEntries(ALL_LAYERS.map((l) => [l.id, false])));
 
+  // Hard-enforce the Free radius limit at the state boundary. This protects
+  // against sliders, presets, restored reports, or any other caller setting
+  // a radius above 500 ft. Pro users retain the requested radius.
+  useEffect(() => {
+    if (!pro && radius > FREE_RADIUS_METERS) {
+      setRadius(FREE_RADIUS_METERS);
+    }
+  }, [pro, radius]);
+
+  const handleRadiusChange = useCallback((nextRadius) => {
+    const safeRadius = Number.isFinite(nextRadius) ? nextRadius : FREE_RADIUS_METERS;
+    if (!pro && safeRadius > FREE_RADIUS_METERS) {
+      setRadius(FREE_RADIUS_METERS);
+      setUpgrade({ reason: "An adjustable radius is a Pro feature. Free accounts are limited to 500 ft." });
+      return;
+    }
+    setRadius(pro ? safeRadius : Math.min(safeRadius, FREE_RADIUS_METERS));
+  }, [pro]);
+
   const placePin = (coords, zoom) => {
     setProperty(null);
     setPropertyB(null);
+    if (pro) {
+      const id = `pin-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`;
+      setPins((prev) => [...prev, { id, coords }]);
+      setActivePinId(id);
+    } else {
+      setPins([]);
+      setActivePinId(null);
+    }
     setPin(coords);
     setView({ center: coords, zoom: zoom ?? view.zoom });
+  };
+
+  const selectPin = (id) => {
+    const selected = pins.find((p) => p.id === id);
+    if (!selected) return;
+    setActivePinId(id);
+    setPin(selected.coords);
+    setProperty(null);
+    setView({ center: selected.coords, zoom: Math.max(view.zoom, 15) });
+  };
+
+  const removePin = (id) => {
+    setPins((prev) => {
+      const next = prev.filter((p) => p.id !== id);
+      if (id === activePinId) {
+        const nextActive = next[0];
+        setActivePinId(nextActive?.id ?? null);
+        setPin(nextActive?.coords ?? null);
+        if (nextActive) setView({ center: nextActive.coords, zoom: Math.max(view.zoom, 15) });
+        else setProperty(null);
+      }
+      return next;
+    });
+  };
+
+  const clearPins = () => {
+    setPins([]);
+    setActivePinId(null);
+    setPin(null);
+    setProperty(null);
+    setPropertyB(null);
   };
   const onMapClick = (coords) => {
     if (Array.isArray(drawPoints)) {
@@ -213,7 +301,9 @@ export default function MapWorkstation() {
     }
     placePin(coords);
     setClickPinMode(false);
-    toast.success("Pin dropped", { description: `${coords[0].toFixed(4)}, ${coords[1].toFixed(4)}` });
+    toast.success(pro ? `Location ${pins.length + 1} added` : "Pin dropped", {
+      description: `${coords[0].toFixed(4)}, ${coords[1].toFixed(4)}`,
+    });
   };
   const onSearchSelect = (coords, label) => {
     placePin(coords, 15);
@@ -286,6 +376,8 @@ export default function MapWorkstation() {
 
   const snapshotState = () => ({
     pin,
+    pins: pro ? pins : [],
+    activePinId: pro ? activePinId : null,
     radius,
     property,
     propertyB,
@@ -344,7 +436,11 @@ export default function MapWorkstation() {
     for (const src of [proximityData, dataB]) {
       for (const [cat, list] of Object.entries(src?.categories || {})) {
         const seen = new Set((out[cat]?.features || []).map((f) => f.id));
-        out[cat] = { features: [...(out[cat]?.features || []), ...list.filter((f) => !seen.has(f.id))] };
+        // Only render POIs that are actually inside the active analysis radius.
+        // Property comparisons can request a larger search envelope, so filter
+        // here as the final visual guardrail.
+        const visible = list.filter((f) => Number(f.distance_m) <= effectiveRadius + 0.5 && !seen.has(f.id));
+        out[cat] = { features: [...(out[cat]?.features || []), ...visible] };
       }
     }
     return out;
@@ -413,13 +509,14 @@ export default function MapWorkstation() {
             basemap={basemap}
             view={view}
             pin={pin}
+            pins={pins}
             onMapClick={onMapClick}
             clickPinMode={clickPinMode}
             drawPoints={drawPoints}
             drawTarget={drawTarget}
             property={property}
             propertyB={propertyB}
-            radius={radius}
+            radius={effectiveRadius}
             layerData={layerData}
             layerVisibility={visibility}
             layerOpacity={opacity}
@@ -428,7 +525,9 @@ export default function MapWorkstation() {
             trafficTileUrl={trafficCfg.enabled ? TRAFFIC_TILE_URL : null}
           />
           <Legend visibility={visibility} counts={counts} customLayers={customLayers} />
-          <AIAnalyst context={aiContext} pro={pro} onUpgrade={(reason) => setUpgrade({ reason })} />
+          <Suspense fallback={null}>
+            <AIAnalyst context={aiContext} pro={pro} onUpgrade={(reason) => setUpgrade({ reason })} />
+          </Suspense>
           {capturing && (
             <div className="pointer-events-none absolute left-1/2 top-4 z-30 -translate-x-1/2 rounded-full border border-amber-400/30 bg-slate-900/90 px-4 py-1.5 backdrop-blur-xl">
               <span className="font-mono text-xs uppercase tracking-widest text-amber-300" data-testid="capture-hint">
@@ -443,8 +542,15 @@ export default function MapWorkstation() {
         >
           <ProximityPanel
             pin={pin}
-            radius={radius}
-            onRadiusChange={setRadius}
+            pins={pins}
+            activePinId={activePinId}
+            onSelectPin={selectPin}
+            onRemovePin={removePin}
+            onClearPins={clearPins}
+            pro={pro}
+            radius={effectiveRadius}
+            onRadiusChange={handleRadiusChange}
+            onUpgrade={(reason) => setUpgrade({ reason })}
             onSearchSelect={onSearchSelect}
             clickPinMode={clickPinMode}
             setClickPinMode={setClickPinMode}
@@ -474,9 +580,10 @@ export default function MapWorkstation() {
           </button>
         </div>
       </div>
-      <UploadModal open={uploadOpen} onOpenChange={setUploadOpen} onCreated={onCreatedCustom} />
-      <PrintReport
-        open={reportOpen}
+      <Suspense fallback={null}>
+        <UploadModal open={uploadOpen} onOpenChange={setUploadOpen} onCreated={onCreatedCustom} />
+        <PrintReport
+          open={reportOpen}
         onClose={() => setReportOpen(false)}
         pin={pin}
         radius={radius}
@@ -486,10 +593,11 @@ export default function MapWorkstation() {
         dataB={dataB}
         env={env}
         branding={user?.branding}
-        aiContext={aiContext}
-      />
-      <AuthDialog open={authOpen} onOpenChange={setAuthOpen} />
-      {brandingOpen && <BrandingDialog open onOpenChange={setBrandingOpen} />}
+          aiContext={aiContext}
+        />
+        <AuthDialog open={authOpen} onOpenChange={setAuthOpen} />
+        {brandingOpen && <BrandingDialog open onOpenChange={setBrandingOpen} />}
+      </Suspense>
       <UpgradeDialog
         open={!!upgrade}
         onOpenChange={(v) => !v && setUpgrade(null)}

@@ -40,18 +40,30 @@ export function haversine(lat1, lon1, lat2, lon2) {
 async function _postOverpass(query, signal) {
   const attempts = OVERPASS_ENDPOINTS.map((url) => {
     const ctrl = new AbortController();
-    const timer = setTimeout(() => ctrl.abort(), 20000);
+    const timer = setTimeout(() => ctrl.abort(), 18000);
     if (signal) signal.addEventListener("abort", () => ctrl.abort(), { once: true });
-    return fetch(url, { method: "POST", body: new URLSearchParams({ data: query }), signal: ctrl.signal })
-      .then(async (r) => {
-        clearTimeout(timer);
-        if (!r.ok) throw new Error(`overpass ${r.status}`);
-        return r.json();
-      })
-      .catch((e) => {
-        clearTimeout(timer);
-        throw e;
-      });
+
+    const request = async () => {
+      try {
+        const post = await fetch(url, {
+          method: "POST",
+          body: new URLSearchParams({ data: query }),
+          signal: ctrl.signal,
+        });
+        if (!post.ok) throw new Error(`overpass POST ${post.status}`);
+        return post.json();
+      } catch (postError) {
+        // Some Overpass mirrors intermittently reject POST while GET works.
+        // Use the same provider as a lightweight second chance.
+        if (ctrl.signal.aborted) throw postError;
+        const getUrl = `${url}?${new URLSearchParams({ data: query }).toString()}`;
+        const get = await fetch(getUrl, { method: "GET", signal: ctrl.signal });
+        if (!get.ok) throw new Error(`overpass GET ${get.status}`);
+        return get.json();
+      }
+    };
+
+    return request().finally(() => clearTimeout(timer));
   });
   return Promise.any(attempts);
 }

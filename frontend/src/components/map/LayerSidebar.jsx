@@ -92,10 +92,11 @@ export default function LayerSidebar({
   trafficEnabled,
   mobileOpen = false,
   onMobileClose,
+  desktopOpen = true,
 }) {
   return (
     <aside
-      className="flex h-full w-80 shrink-0 flex-col border-r border-white/5 bg-[#0b0f17]/95 backdrop-blur-xl"
+      className={`flex h-full w-80 shrink-0 flex-col border-r border-white/5 bg-[#0b0f17]/95 backdrop-blur-xl transition-transform duration-300 ease-in-out ${desktopOpen ? "translate-x-0" : "-translate-x-full"} ${mobileOpen ? "absolute inset-y-0 left-0 z-40" : ""}`}
       data-testid="layer-sidebar"
     >
       <div className="flex items-center justify-between border-b border-white/5 px-4 py-3.5">

@@ -51,8 +51,15 @@ function EnvStat({ icon: Icon, label, value, unit, color }) {
 
 export default function ProximityPanel({
   pin,
+  pins = [],
+  activePinId,
+  onSelectPin,
+  onRemovePin,
+  onClearPins,
+  pro = false,
   radius,
   onRadiusChange,
+  onUpgrade,
   onSearchSelect,
   clickPinMode,
   setClickPinMode,
@@ -68,6 +75,7 @@ export default function ProximityPanel({
   visibility,
   mobileOpen = false,
   onMobileClose,
+  desktopOpen = true,
 }) {
   const [q, setQ] = useState("");
   const [results, setResults] = useState([]);
@@ -93,9 +101,9 @@ export default function ProximityPanel({
 
   return (
     <aside
-      className={mobileOpen
+      className={`${mobileOpen
         ? "absolute inset-y-0 right-0 z-30 flex h-full w-[min(92vw,24rem)] shrink-0 flex-col border-l border-white/5 bg-[#0b0f17]/98 shadow-2xl backdrop-blur-xl md:relative md:w-96"
-        : "hidden h-full w-96 shrink-0 flex-col border-l border-white/5 bg-[#0b0f17]/95 backdrop-blur-xl md:flex"}
+        : "flex h-full w-96 shrink-0 flex-col border-l border-white/5 bg-[#0b0f17]/95 backdrop-blur-xl"} transition-transform duration-300 ease-in-out ${mobileOpen || desktopOpen ? "translate-x-0" : "translate-x-full"}`}
       data-testid="proximity-panel"
     >
       <div className="border-b border-white/5 px-4 py-3.5">
@@ -164,7 +172,7 @@ export default function ProximityPanel({
             data-testid="drop-pin-button"
           >
             <Crosshair size={14} className="mr-2" />
-            {clickPinMode ? "Drop pin…" : "Drop pin"}
+            {clickPinMode ? (pro ? "Add location…" : "Drop pin…") : (pro ? "Add pin" : "Drop pin")}
           </Button>
           <Button
             variant="outline"
@@ -178,6 +186,38 @@ export default function ProximityPanel({
           </Button>
         </div>
 
+        {pro && pins.length > 0 && (
+          <div className="rounded-xl border border-sky-500/20 bg-sky-500/5 p-3">
+            <div className="mb-2 flex items-center justify-between">
+              <span className="text-[10px] font-mono uppercase tracking-widest text-sky-300">Pro locations</span>
+              <Badge className="border border-sky-500/20 bg-sky-500/10 text-sky-300">{pins.length}</Badge>
+            </div>
+            <div className="space-y-1.5">
+              {pins.map((p, i) => (
+                <div key={p.id} className={`flex items-center gap-2 rounded-lg border px-2 py-1.5 ${p.id === activePinId ? "border-sky-400/40 bg-sky-400/10" : "border-white/5 bg-slate-900/40"}`}>
+                  <button type="button" onClick={() => onSelectPin(p.id)} className="min-w-0 flex-1 text-left">
+                    <span className="block text-[10px] font-mono uppercase tracking-widest text-slate-400">Location {i + 1}</span>
+                    <span className="block truncate font-mono text-[10px] text-slate-200">{p.coords[0].toFixed(5)}, {p.coords[1].toFixed(5)}</span>
+                  </button>
+                  <Button size="icon" variant="ghost" className="h-6 w-6 text-slate-500 hover:text-red-300" onClick={() => onRemovePin(p.id)} aria-label={`Remove location ${i + 1}`}>
+                    <X size={12} />
+                  </Button>
+                </div>
+              ))}
+            </div>
+            {pins.length > 1 && (
+              <Button type="button" variant="outline" size="sm" onClick={onClearPins} className="mt-2 h-7 w-full border-white/10 bg-transparent text-[10px] text-slate-400 hover:text-slate-200">
+                Clear all locations
+              </Button>
+            )}
+          </div>
+        )}
+        {!pro && pin && (
+          <div className="rounded-lg border border-amber-500/20 bg-amber-500/5 px-3 py-2 text-[10px] text-amber-200/80">
+            Pro unlocks multiple locations on the same map.
+          </div>
+        )}
+
         <PropertyTools {...propertyTools} />
       </div>
 
@@ -185,23 +225,23 @@ export default function ProximityPanel({
         <div className="mb-2 flex items-center justify-between">
           <span className="text-[10px] font-mono uppercase tracking-widest text-slate-400">Buffer radius</span>
           <span className="font-mono text-sm font-semibold text-sky-400" data-testid="radius-value">
-            {fmtRadius(radius)}
+            {fmtRadius(pro ? radius : 152.4)}
           </span>
         </div>
         <Slider
-          value={[radius]}
+          value={[pro ? radius : Math.min(radius, 152.4)]}
           min={100}
-          max={16093}
+          max={pro ? 16093 : 152.4}
           step={10}
-          onValueChange={(v) => onRadiusChange(v[0])}
+          onValueChange={(v) => onRadiusChange(pro ? v[0] : Math.min(v[0], 152.4))}
           data-testid="radius-slider"
         />
         <div className="mt-1 flex justify-between text-[10px] font-mono text-slate-600">
           <span>328 ft</span>
-          <span>10 mi</span>
+          <span>{pro ? "10 mi" : "500 ft · Free limit"}</span>
         </div>
         <div className="mt-3 grid grid-cols-3 gap-1.5">
-          {RADIUS_PRESETS.map((preset) => (
+          {(pro ? RADIUS_PRESETS : [RADIUS_PRESETS[0]]).map((preset) => (
             <Button
               key={preset.label}
               type="button"
@@ -216,6 +256,15 @@ export default function ProximityPanel({
             </Button>
           ))}
         </div>
+        {!pro && (
+          <button
+            type="button"
+            onClick={() => onUpgrade?.("Unlock an adjustable radius with Pro — Free is limited to 500 ft.")}
+            className="mt-3 w-full rounded-lg border border-sky-500/20 bg-sky-500/5 px-3 py-2 text-left text-[10px] text-slate-400 hover:border-sky-400/40 hover:text-sky-300"
+          >
+            <span className="font-semibold text-sky-300">Pro:</span> adjustable radius up to 10 miles.
+          </button>
+        )}
       </div>
 
       <ScrollArea className="flex-1">
@@ -291,7 +340,7 @@ export default function ProximityPanel({
                 <div className="flex items-start gap-2 rounded-lg border border-amber-400/30 bg-amber-400/5 p-3" data-testid="poi-unavailable-banner">
                   <AlertTriangle size={14} className="mt-0.5 shrink-0 text-amber-300" />
                   <div className="flex-1 text-xs text-amber-100">
-                    Live OpenStreetMap data unavailable for {proximityData.unavailable.map((c) => LAYER_BY_ID[c]?.label || c).join(", ")}. Nothing was substituted.
+                    Live place data unavailable for {proximityData.unavailable.map((c) => LAYER_BY_ID[c]?.label || c).join(", ")}. Nothing was substituted.
                     <button onClick={onRetry} className="ml-2 font-mono text-[10px] uppercase tracking-widest text-amber-300 underline-offset-2 hover:underline" data-testid="poi-retry-button">
                       Retry
                     </button>
@@ -303,7 +352,7 @@ export default function ProximityPanel({
                 <div className="space-y-3">
                   {proximityData.total > 0 && (
                     <div className="text-[10px] font-mono uppercase tracking-widest text-slate-500" data-testid="poi-source">
-                      Live OpenStreetMap data · straight-line distances
+                      Live place data · straight-line distances
                     </div>
                   )}
                   {Object.entries(proximityData.categories)

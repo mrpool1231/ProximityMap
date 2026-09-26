@@ -2,6 +2,15 @@ import axios from "axios";
 import { queryCategory, geocodeClient } from "@/lib/overpass";
 
 const BACKEND_URL = process.env.REACT_APP_BACKEND_URL;
+
+// Short-lived client cache prevents repeated POI requests while the user pans,
+// toggles panels, or switches between nearby UI states. In-flight requests are
+// shared so the same search is never fetched twice at once.
+const poiCache = new Map();
+const poiInFlight = new Map();
+const POI_CACHE_MS = 30_000;
+const poiKey = ({ lat, lon, radius, categories }) =>
+  `${Number(lat).toFixed(4)}|${Number(lon).toFixed(4)}|${Math.round(radius)}|${[...categories].sort().join(",")}`;
 export const API = `${BACKEND_URL}/api`;
 
 export const api = axios.create({ baseURL: API, timeout: 40000, withCredentials: true });
@@ -62,30 +71,93 @@ export async function geocode(q) {
 }
 
 export async function fetchPOIs({ lat, lon, radius, categories }) {
-  // Browser-side Overpass and the backend proxy are raced per category; both
-  // return the same live OpenStreetMap data, whichever answers first wins.
-  // Categories neither source could fetch are reported as unavailable — never
-  // substituted with fake data.
-  const backend = api
-    .get("/pois", { params: { lat, lon, radius, categories: categories.join(",") }, timeout: 30000 })
-    .then((r) => r.data)
-    .catch(() => ({ categories: {} }));
-  const settled = await Promise.all(
-    categories.map((c) =>
-      Promise.any([
-        queryCategory({ category: c, lat, lon, radius }).then((r) => r ?? Promise.reject(new Error("browser failed"))),
-        backend.then((d) => d.categories?.[c] ?? Promise.reject(new Error("backend failed"))),
-      ]).catch(() => null)
-    )
-  );
-  const result = { center: { lat, lon }, radius, categories: {}, counts: {}, total: 0, unavailable: [], source: "osm" };
-  categories.forEach((c, i) => {
-    if (settled[i] === null) return result.unavailable.push(c);
-    result.categories[c] = settled[i];
-    result.counts[c] = settled[i].length;
-    result.total += settled[i].length;
-  });
-  return result;
+  const key = poiKey({ lat, lon, radius, categories });
+  const cached = poiCache.get(key);
+  if (cached && Date.now() - cached.time < POI_CACHE_MS) return cached.data;
+  if (poiInFlight.has(key)) return poiInFlight.get(key);
+  const request = (async () => {
+    // Prefer the backend for the normal path. Browser-side Overpass is kept as
+    // a fallback only for categories the backend cannot provide or if the
+    // backend request fails completely. This avoids racing duplicate requests
+    // on every search while preserving the existing live-data fallback.
+    const buildResult = () => ({
+      center: { lat, lon },
+      radius,
+      categories: {},
+      counts: {},
+      total: 0,
+      unavailable: [],
+      source: "live",
+    });
+
+    try {
+      const { data } = await api.get("/pois", {
+        params: { lat, lon, radius, categories: categories.join(",") },
+        timeout: 9000,
+      });
+
+      const result = buildResult();
+      result.source = data.source || "live";
+      const missing = [];
+
+      categories.forEach((c) => {
+        const items = data.categories?.[c];
+        if (Array.isArray(items)) {
+          result.categories[c] = items;
+          result.counts[c] = items.length;
+          result.total += items.length;
+        } else {
+          missing.push(c);
+        }
+      });
+
+      if (missing.length) {
+        const fallback = await Promise.all(
+          missing.map((c) => queryCategory({ category: c, lat, lon, radius }))
+        );
+        missing.forEach((c, i) => {
+          if (fallback[i] === null) {
+            result.unavailable.push(c);
+            return;
+          }
+          result.categories[c] = fallback[i];
+          result.counts[c] = fallback[i].length;
+          result.total += fallback[i].length;
+        });
+      }
+
+      return result;
+    } catch {
+      // Complete backend failure: preserve the browser-side Overpass fallback.
+      const settled = await Promise.all(
+        categories.map((c) => queryCategory({ category: c, lat, lon, radius }))
+      );
+      const result = buildResult();
+
+      categories.forEach((c, i) => {
+        if (settled[i] === null) {
+          result.unavailable.push(c);
+          return;
+        }
+        result.categories[c] = settled[i];
+        result.counts[c] = settled[i].length;
+        result.total += settled[i].length;
+      });
+
+      return result;
+    }
+  }
+
+    return null;
+  })();
+  poiInFlight.set(key, request);
+  try {
+    const data = await request;
+    if (data) poiCache.set(key, { time: Date.now(), data });
+    return data;
+  } finally {
+    poiInFlight.delete(key);
+  }
 }
 
 export async function fetchWeather(lat, lon) {
