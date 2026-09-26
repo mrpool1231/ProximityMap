@@ -259,7 +259,7 @@ export default function ProximityPanel({
         {!pro && (
           <button
             type="button"
-            onClick={() => onUpgrade?.("Unlock an adjustable radius with Pro — Free is limited to 500 ft.")}
+            onClick={() => onUpgrade?.("Unlock an adjustable radius with Pro — Free is limited to 2,000 ft.")}
             className="mt-3 w-full rounded-lg border border-sky-500/20 bg-sky-500/5 px-3 py-2 text-left text-[10px] text-slate-400 hover:border-sky-400/40 hover:text-sky-300"
           >
             <span className="font-semibold text-sky-300">Pro:</span> adjustable radius up to 10 miles.

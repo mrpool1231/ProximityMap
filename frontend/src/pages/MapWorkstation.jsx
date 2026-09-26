@@ -44,7 +44,7 @@ const initialVisibility = () => {
   return v;
 };
 
-const FREE_RADIUS_METERS = 152.4; // 500 ft
+const FREE_RADIUS_METERS = 609.6; // 500 ft
 
 const initialOpacity = () => {
   const o = {};
@@ -243,7 +243,7 @@ export default function MapWorkstation() {
     const safeRadius = Number.isFinite(nextRadius) ? nextRadius : FREE_RADIUS_METERS;
     if (!pro && safeRadius > FREE_RADIUS_METERS) {
       setRadius(FREE_RADIUS_METERS);
-      setUpgrade({ reason: "An adjustable radius is a Pro feature. Free accounts are limited to 500 ft." });
+      setUpgrade({ reason: "An adjustable radius is a Pro feature. Free accounts are limited to 2,000 ft." });
       return;
     }
     setRadius(pro ? safeRadius : Math.min(safeRadius, FREE_RADIUS_METERS));
