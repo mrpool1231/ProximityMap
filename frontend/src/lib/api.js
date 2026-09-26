@@ -146,9 +146,6 @@ export async function fetchPOIs({ lat, lon, radius, categories }) {
 
       return result;
     }
-  }
-
-    return null;
   })();
   poiInFlight.set(key, request);
   try {
