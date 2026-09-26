@@ -29,7 +29,6 @@ import {
 import { propertyCentroid, propertyReach, applyPropertyDistances } from "@/lib/geo";
 import { getLicense, clearLicense, stashResumeState, popResumeState } from "@/lib/license";
 import { toast } from "sonner";
-import { ChevronLeft, ChevronRight } from "lucide-react";
 
 const ALL_LAYERS = [...POI_LAYERS, ...ENV_LAYERS, ...CONCEPT_LAYERS];
 
@@ -60,11 +59,6 @@ export default function MapWorkstation() {
   const [dataB, setDataB] = useState(null);
   const [loadingB, setLoadingB] = useState(false);
   const [retryTick, setRetryTick] = useState(0);
-  const [locating, setLocating] = useState(false);
-  const [mobileLayersOpen, setMobileLayersOpen] = useState(false);
-  const [mobileAnalysisOpen, setMobileAnalysisOpen] = useState(false);
-  const [layersOpen, setLayersOpen] = useState(true);
-  const [analysisOpen, setAnalysisOpen] = useState(true);
 
   const [visibility, setVisibility] = useState(initialVisibility);
   const [opacity, setOpacity] = useState(initialOpacity);
@@ -197,7 +191,7 @@ export default function MapWorkstation() {
 
   const onToggle = useCallback((id, v) => setVisibility((prev) => ({ ...prev, [id]: v })), []);
   const onOpacityChange = useCallback((id, v) => setOpacity((prev) => ({ ...prev, [id]: v })), []);
-  const selectAll = () => setVisibility(Object.fromEntries(ALL_LAYERS.map((l) => [l.id, l.id === "traffic" ? trafficCfg.enabled : true])));
+  const selectAll = () => setVisibility(Object.fromEntries(ALL_LAYERS.map((l) => [l.id, true])));
   const hideAll = () => setVisibility(Object.fromEntries(ALL_LAYERS.map((l) => [l.id, false])));
 
   const placePin = (coords, zoom) => {
@@ -218,33 +212,6 @@ export default function MapWorkstation() {
   const onSearchSelect = (coords, label) => {
     placePin(coords, 15);
     toast.success("Location set", { description: label?.split(",").slice(0, 2).join(",") });
-  };
-
-  const onUseLocation = () => {
-    if (!navigator.geolocation) {
-      toast.error("Location is not supported by this browser");
-      return;
-    }
-    setLocating(true);
-    navigator.geolocation.getCurrentPosition(
-      ({ coords }) => {
-        const next = [coords.latitude, coords.longitude];
-        placePin(next, 16);
-        setClickPinMode(false);
-        toast.success("Current location set", { description: `${next[0].toFixed(4)}, ${next[1].toFixed(4)}` });
-        setLocating(false);
-      },
-      (error) => {
-        const message = error.code === error.PERMISSION_DENIED
-          ? "Location permission was denied"
-          : error.code === error.POSITION_UNAVAILABLE
-            ? "Your location is currently unavailable"
-            : "Could not determine your location";
-        toast.error(message);
-        setLocating(false);
-      },
-      { enableHighAccuracy: true, timeout: 12000, maximumAge: 60000 }
-    );
   };
 
   const setOutline = (target, latlngs, zoom) => {
@@ -368,46 +335,26 @@ export default function MapWorkstation() {
         onPrint={onPrint}
         sharing={sharing}
         isPro={pro}
-        onUpgrade={() => setUpgrade({ reason: "Unlock ProximityMap Pro" })}
+        onUpgrade={() => setUpgrade({ reason: "Unlock MapApp Pro" })}
         onSignIn={() => setAuthOpen(true)}
         onBranding={() => setBrandingOpen(true)}
-        onToggleLayers={() => setMobileLayersOpen((v) => !v)}
-        onToggleAnalysis={() => setMobileAnalysisOpen((v) => !v)}
       />
       <div className="flex flex-1 min-h-0">
-        <div
-          className={`relative shrink-0 overflow-visible transition-[width] duration-300 ease-in-out ${layersOpen ? "w-80" : "w-0"}`}
-          data-testid="layers-panel-container"
-        >
-          <LayerSidebar
-            visibility={visibility}
-            opacity={opacity}
-            counts={counts}
-            onToggle={onToggle}
-            onOpacityChange={onOpacityChange}
-            onSelectAll={selectAll}
-            onHideAll={hideAll}
-            onOpenUpload={() => setUploadOpen(true)}
-            customLayers={customLayers}
-            onToggleCustom={onToggleCustom}
-            onDeleteCustom={onDeleteCustom}
-            onCustomOpacity={onCustomOpacity}
-            trafficEnabled={trafficCfg.enabled}
-            mobileOpen={mobileLayersOpen}
-            onMobileClose={() => setMobileLayersOpen(false)}
-            desktopOpen={layersOpen}
-          />
-          <button
-            type="button"
-            onClick={() => setLayersOpen((v) => !v)}
-            className={`absolute top-1/2 z-50 hidden h-16 w-7 -translate-y-1/2 items-center justify-center rounded-r-lg border border-l-0 border-white/10 bg-[#0b0f17]/95 text-slate-300 shadow-xl backdrop-blur-xl transition-all duration-300 hover:bg-slate-800 hover:text-sky-300 md:flex ${layersOpen ? "right-0 translate-x-full" : "left-0"}`}
-            aria-label={layersOpen ? "Collapse layer control" : "Open layer control"}
-            title={layersOpen ? "Collapse layers" : "Open layers"}
-            data-testid="toggle-layers-panel"
-          >
-            {layersOpen ? <ChevronLeft size={15} /> : <ChevronRight size={15} />}
-          </button>
-        </div>
+        <LayerSidebar
+          visibility={visibility}
+          opacity={opacity}
+          counts={counts}
+          onToggle={onToggle}
+          onOpacityChange={onOpacityChange}
+          onSelectAll={selectAll}
+          onHideAll={hideAll}
+          onOpenUpload={() => setUploadOpen(true)}
+          customLayers={customLayers}
+          onToggleCustom={onToggleCustom}
+          onDeleteCustom={onDeleteCustom}
+          onCustomOpacity={onCustomOpacity}
+          trafficEnabled={trafficCfg.enabled}
+        />
         <div className={`relative flex-1 min-w-0 ${capturing ? "map-capture-mode" : ""}`}>
           <MapView
             basemap={basemap}
@@ -437,42 +384,21 @@ export default function MapWorkstation() {
             </div>
           )}
         </div>
-        <div
-          className={`relative shrink-0 overflow-visible transition-[width] duration-300 ease-in-out ${analysisOpen ? "w-96" : "w-0"}`}
-          data-testid="analysis-panel-container"
-        >
-          <ProximityPanel
-            pin={pin}
-            radius={radius}
-            onRadiusChange={setRadius}
-            onSearchSelect={onSearchSelect}
-            clickPinMode={clickPinMode}
-            setClickPinMode={setClickPinMode}
-            proximityData={proximityData}
-            loading={loadingPois}
-            onFocusPoi={focusPoi}
-            env={env}
-            propertyTools={propertyTools}
-            compare={{ propertyB, dataB, loadingB }}
-            onRetry={() => setRetryTick((t) => t + 1)}
-            onUseLocation={onUseLocation}
-            locating={locating}
-            visibility={visibility}
-            mobileOpen={mobileAnalysisOpen}
-            onMobileClose={() => setMobileAnalysisOpen(false)}
-            desktopOpen={analysisOpen}
-          />
-          <button
-            type="button"
-            onClick={() => setAnalysisOpen((v) => !v)}
-            className={`absolute top-1/2 z-50 hidden h-16 w-7 -translate-y-1/2 items-center justify-center rounded-l-lg border border-r-0 border-white/10 bg-[#0b0f17]/95 text-slate-300 shadow-xl backdrop-blur-xl transition-all duration-300 hover:bg-slate-800 hover:text-amber-300 md:flex ${analysisOpen ? "left-0 -translate-x-full" : "right-0"}`}
-            aria-label={analysisOpen ? "Collapse proximity analysis" : "Open proximity analysis"}
-            title={analysisOpen ? "Collapse analysis" : "Open analysis"}
-            data-testid="toggle-analysis-panel"
-          >
-            {analysisOpen ? <ChevronRight size={15} /> : <ChevronLeft size={15} />}
-          </button>
-        </div>
+        <ProximityPanel
+          pin={pin}
+          radius={radius}
+          onRadiusChange={setRadius}
+          onSearchSelect={onSearchSelect}
+          clickPinMode={clickPinMode}
+          setClickPinMode={setClickPinMode}
+          proximityData={proximityData}
+          loading={loadingPois}
+          onFocusPoi={focusPoi}
+          env={env}
+          propertyTools={propertyTools}
+          compare={{ propertyB, dataB, loadingB }}
+          onRetry={() => setRetryTick((t) => t + 1)}
+        />
       </div>
       <UploadModal open={uploadOpen} onOpenChange={setUploadOpen} onCreated={onCreatedCustom} />
       <PrintReport

@@ -29,7 +29,6 @@ import {
 import { propertyCentroid, propertyReach, applyPropertyDistances } from "@/lib/geo";
 import { getLicense, clearLicense, stashResumeState, popResumeState } from "@/lib/license";
 import { toast } from "sonner";
-import { ChevronLeft, ChevronRight } from "lucide-react";
 
 const ALL_LAYERS = [...POI_LAYERS, ...ENV_LAYERS, ...CONCEPT_LAYERS];
 
@@ -63,8 +62,6 @@ export default function MapWorkstation() {
   const [locating, setLocating] = useState(false);
   const [mobileLayersOpen, setMobileLayersOpen] = useState(false);
   const [mobileAnalysisOpen, setMobileAnalysisOpen] = useState(false);
-  const [layersOpen, setLayersOpen] = useState(true);
-  const [analysisOpen, setAnalysisOpen] = useState(true);
 
   const [visibility, setVisibility] = useState(initialVisibility);
   const [opacity, setOpacity] = useState(initialOpacity);
@@ -375,39 +372,23 @@ export default function MapWorkstation() {
         onToggleAnalysis={() => setMobileAnalysisOpen((v) => !v)}
       />
       <div className="flex flex-1 min-h-0">
-        <div
-          className={`relative shrink-0 overflow-visible transition-[width] duration-300 ease-in-out ${layersOpen ? "w-80" : "w-0"}`}
-          data-testid="layers-panel-container"
-        >
-          <LayerSidebar
-            visibility={visibility}
-            opacity={opacity}
-            counts={counts}
-            onToggle={onToggle}
-            onOpacityChange={onOpacityChange}
-            onSelectAll={selectAll}
-            onHideAll={hideAll}
-            onOpenUpload={() => setUploadOpen(true)}
-            customLayers={customLayers}
-            onToggleCustom={onToggleCustom}
-            onDeleteCustom={onDeleteCustom}
-            onCustomOpacity={onCustomOpacity}
-            trafficEnabled={trafficCfg.enabled}
-            mobileOpen={mobileLayersOpen}
-            onMobileClose={() => setMobileLayersOpen(false)}
-            desktopOpen={layersOpen}
-          />
-          <button
-            type="button"
-            onClick={() => setLayersOpen((v) => !v)}
-            className={`absolute top-1/2 z-50 hidden h-16 w-7 -translate-y-1/2 items-center justify-center rounded-r-lg border border-l-0 border-white/10 bg-[#0b0f17]/95 text-slate-300 shadow-xl backdrop-blur-xl transition-all duration-300 hover:bg-slate-800 hover:text-sky-300 md:flex ${layersOpen ? "right-0 translate-x-full" : "left-0"}`}
-            aria-label={layersOpen ? "Collapse layer control" : "Open layer control"}
-            title={layersOpen ? "Collapse layers" : "Open layers"}
-            data-testid="toggle-layers-panel"
-          >
-            {layersOpen ? <ChevronLeft size={15} /> : <ChevronRight size={15} />}
-          </button>
-        </div>
+        <LayerSidebar
+          visibility={visibility}
+          opacity={opacity}
+          counts={counts}
+          onToggle={onToggle}
+          onOpacityChange={onOpacityChange}
+          onSelectAll={selectAll}
+          onHideAll={hideAll}
+          onOpenUpload={() => setUploadOpen(true)}
+          customLayers={customLayers}
+          onToggleCustom={onToggleCustom}
+          onDeleteCustom={onDeleteCustom}
+          onCustomOpacity={onCustomOpacity}
+          trafficEnabled={trafficCfg.enabled}
+          mobileOpen={mobileLayersOpen}
+          onMobileClose={() => setMobileLayersOpen(false)}
+        />
         <div className={`relative flex-1 min-w-0 ${capturing ? "map-capture-mode" : ""}`}>
           <MapView
             basemap={basemap}
@@ -437,42 +418,26 @@ export default function MapWorkstation() {
             </div>
           )}
         </div>
-        <div
-          className={`relative shrink-0 overflow-visible transition-[width] duration-300 ease-in-out ${analysisOpen ? "w-96" : "w-0"}`}
-          data-testid="analysis-panel-container"
-        >
-          <ProximityPanel
-            pin={pin}
-            radius={radius}
-            onRadiusChange={setRadius}
-            onSearchSelect={onSearchSelect}
-            clickPinMode={clickPinMode}
-            setClickPinMode={setClickPinMode}
-            proximityData={proximityData}
-            loading={loadingPois}
-            onFocusPoi={focusPoi}
-            env={env}
-            propertyTools={propertyTools}
-            compare={{ propertyB, dataB, loadingB }}
-            onRetry={() => setRetryTick((t) => t + 1)}
-            onUseLocation={onUseLocation}
-            locating={locating}
-            visibility={visibility}
-            mobileOpen={mobileAnalysisOpen}
-            onMobileClose={() => setMobileAnalysisOpen(false)}
-            desktopOpen={analysisOpen}
-          />
-          <button
-            type="button"
-            onClick={() => setAnalysisOpen((v) => !v)}
-            className={`absolute top-1/2 z-50 hidden h-16 w-7 -translate-y-1/2 items-center justify-center rounded-l-lg border border-r-0 border-white/10 bg-[#0b0f17]/95 text-slate-300 shadow-xl backdrop-blur-xl transition-all duration-300 hover:bg-slate-800 hover:text-amber-300 md:flex ${analysisOpen ? "left-0 -translate-x-full" : "right-0"}`}
-            aria-label={analysisOpen ? "Collapse proximity analysis" : "Open proximity analysis"}
-            title={analysisOpen ? "Collapse analysis" : "Open analysis"}
-            data-testid="toggle-analysis-panel"
-          >
-            {analysisOpen ? <ChevronRight size={15} /> : <ChevronLeft size={15} />}
-          </button>
-        </div>
+        <ProximityPanel
+          pin={pin}
+          radius={radius}
+          onRadiusChange={setRadius}
+          onSearchSelect={onSearchSelect}
+          clickPinMode={clickPinMode}
+          setClickPinMode={setClickPinMode}
+          proximityData={proximityData}
+          loading={loadingPois}
+          onFocusPoi={focusPoi}
+          env={env}
+          propertyTools={propertyTools}
+          compare={{ propertyB, dataB, loadingB }}
+          onRetry={() => setRetryTick((t) => t + 1)}
+          onUseLocation={onUseLocation}
+          locating={locating}
+          visibility={visibility}
+          mobileOpen={mobileAnalysisOpen}
+          onMobileClose={() => setMobileAnalysisOpen(false)}
+        />
       </div>
       <UploadModal open={uploadOpen} onOpenChange={setUploadOpen} onCreated={onCreatedCustom} />
       <PrintReport
