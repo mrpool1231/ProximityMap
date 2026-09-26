@@ -444,7 +444,7 @@ export default function MapWorkstation() {
       }
     }
     return out;
-  }, [proximityData, dataB]);
+  }, [proximityData, dataB, effectiveRadius]);
 
   const counts = proximityData?.counts || {};
   const focusPoi = (poi) => setView({ center: [poi.lat, poi.lon], zoom: 17 });

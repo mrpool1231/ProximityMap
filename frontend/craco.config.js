@@ -132,6 +132,16 @@ let webpackConfig = {
       if (emergentOverlay) {
         webpackConfig.plugins.push(emergentOverlay.webpackPlugin);
       }
+
+      // Ignore broken source-map references shipped by the `arc` package.
+      webpackConfig.ignoreWarnings = [
+        ...(webpackConfig.ignoreWarnings || []),
+        {
+          module: /node_modules[\\/]arc[\\/]/,
+          message: /Failed to parse source map/,
+        },
+      ];
+
       return webpackConfig;
     },
   },
