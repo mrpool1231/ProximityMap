@@ -1,4 +1,12 @@
-import * as turf from "@turf/turf";
+import { polygon, point } from "@turf/helpers";
+import centroid from "@turf/centroid";
+import distance from "@turf/distance";
+import area from "@turf/area";
+import buffer from "@turf/buffer";
+import booleanPointInPolygon from "@turf/boolean-point-in-polygon";
+import pointToLineDistance from "@turf/point-to-line-distance";
+import polygonToLine from "@turf/polygon-to-line";
+import bbox from "@turf/bbox";
 
 function toRing(latlngs) {
   const ring = latlngs.map(([lat, lon]) => [lon, lat]);
@@ -8,31 +16,31 @@ function toRing(latlngs) {
   return ring;
 }
 
-export const propertyPolygon = (latlngs) => turf.polygon([toRing(latlngs)]);
+export const propertyPolygon = (latlngs) => polygon([toRing(latlngs)]);
 
 export function propertyCentroid(latlngs) {
-  const c = turf.centroid(propertyPolygon(latlngs)).geometry.coordinates;
+  const c = centroid(propertyPolygon(latlngs)).geometry.coordinates;
   return [c[1], c[0]];
 }
 
 export function propertyReach(latlngs) {
   const [clat, clon] = propertyCentroid(latlngs);
-  return Math.max(...latlngs.map(([lat, lon]) => turf.distance([clon, clat], [lon, lat], { units: "meters" })));
+  return Math.max(...latlngs.map(([lat, lon]) => distance([clon, clat], [lon, lat], { units: "meters" })));
 }
 
-export const propertyArea = (latlngs) => turf.area(propertyPolygon(latlngs));
+export const propertyArea = (latlngs) => area(propertyPolygon(latlngs));
 
-export const propertyBuffer = (latlngs, meters) => turf.buffer(propertyPolygon(latlngs), meters, { units: "meters" });
+export const propertyBuffer = (latlngs, meters) => buffer(propertyPolygon(latlngs), meters, { units: "meters" });
 
 export function distanceToProperty(latlngs, lat, lon) {
   const poly = propertyPolygon(latlngs);
-  const pt = turf.point([lon, lat]);
-  if (turf.booleanPointInPolygon(pt, poly)) return 0;
-  return turf.pointToLineDistance(pt, turf.polygonToLine(poly), { units: "meters" });
+  const pt = point([lon, lat]);
+  if (booleanPointInPolygon(pt, poly)) return 0;
+  return pointToLineDistance(pt, polygonToLine(poly), { units: "meters" });
 }
 
 export function bufferBounds(gj) {
-  const [w, s, e, n] = turf.bbox(gj);
+  const [w, s, e, n] = bbox(gj);
   return [
     [s, w],
     [n, e],
