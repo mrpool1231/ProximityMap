@@ -225,23 +225,23 @@ export default function ProximityPanel({
         <div className="mb-2 flex items-center justify-between">
           <span className="text-[10px] font-mono uppercase tracking-widest text-slate-400">Buffer radius</span>
           <span className="font-mono text-sm font-semibold text-sky-400" data-testid="radius-value">
-            {fmtRadius(pro ? radius : 152.4)}
+            {fmtRadius(pro ? radius : 609.6)}
           </span>
         </div>
         <Slider
-          value={[pro ? radius : Math.min(radius, 152.4)]}
+          value={[pro ? radius : Math.min(radius, 609.6)]}
           min={100}
-          max={pro ? 16093 : 152.4}
+          max={pro ? 16093 : 609.6}
           step={10}
-          onValueChange={(v) => onRadiusChange(pro ? v[0] : Math.min(v[0], 152.4))}
+          onValueChange={(v) => onRadiusChange(pro ? v[0] : Math.min(v[0], 609.6))}
           data-testid="radius-slider"
         />
         <div className="mt-1 flex justify-between text-[10px] font-mono text-slate-600">
           <span>328 ft</span>
-          <span>{pro ? "10 mi" : "500 ft · Free limit"}</span>
+          <span>{pro ? "10 mi" : "2,000 ft · Free limit"}</span>
         </div>
         <div className="mt-3 grid grid-cols-3 gap-1.5">
-          {(pro ? RADIUS_PRESETS : [RADIUS_PRESETS[0]]).map((preset) => (
+          {(pro ? RADIUS_PRESETS : [RADIUS_PRESETS[2]]).map((preset) => (
             <Button
               key={preset.label}
               type="button"
