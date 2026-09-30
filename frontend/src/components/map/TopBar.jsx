@@ -25,7 +25,7 @@ export default function TopBar({ basemap, setBasemap, pin, onShare, onPrint, sha
         </div>
         <div className="min-w-0">
           <div className="font-heading text-base font-bold tracking-tight" data-testid="app-title">
-            Map<span className="text-sky-400">App</span>
+            Proximity<span className="text-sky-400">Map</span>
           </div>
           <div className="hidden text-[10px] font-mono uppercase tracking-widest text-slate-500 sm:block">
             Map · Layers · Proximity
