@@ -2,10 +2,12 @@
 // avoids server-side IP blocks/rate-limits and takes advantage of Overpass'
 // permissive CORS policy. Only real OpenStreetMap data is ever returned.
 
+// Prefer the private.coffee instance because the public OSM instance asks
+// applications not to run parallel queries and may return 429s under load.
 const OVERPASS_ENDPOINTS = [
+  "https://overpass.private.coffee/api/interpreter",
   "https://overpass-api.de/api/interpreter",
   "https://overpass.kumi.systems/api/interpreter",
-  "https://overpass.private.coffee/api/interpreter",
 ];
 
 // nwr = nodes + ways + relations (multipolygon parks/campuses are relations)
@@ -38,12 +40,20 @@ export function haversine(lat1, lon1, lat2, lon2) {
 }
 
 async function _postOverpass(query, signal) {
-  const attempts = OVERPASS_ENDPOINTS.map((url) => {
-    const ctrl = new AbortController();
-    const timer = setTimeout(() => ctrl.abort(), 18000);
-    if (signal) signal.addEventListener("abort", () => ctrl.abort(), { once: true });
+  let firstSuccessfulEmpty = null;
 
-    const request = async () => {
+  // Overpass explicitly discourages parallel requests. Try mirrors one at a
+  // time so one user's analysis does not trip the service rate limiter.
+  for (const url of OVERPASS_ENDPOINTS) {
+    if (signal?.aborted) throw new DOMException("Aborted", "AbortError");
+
+    const ctrl = new AbortController();
+    const timer = setTimeout(() => ctrl.abort(), 12000);
+    const onAbort = () => ctrl.abort();
+    signal?.addEventListener("abort", onAbort, { once: true });
+
+    try {
+      let data;
       try {
         const post = await fetch(url, {
           method: "POST",
@@ -51,7 +61,7 @@ async function _postOverpass(query, signal) {
           signal: ctrl.signal,
         });
         if (!post.ok) throw new Error(`overpass POST ${post.status}`);
-        return post.json();
+        data = await post.json();
       } catch (postError) {
         // Some Overpass mirrors intermittently reject POST while GET works.
         // Use the same provider as a lightweight second chance.
@@ -59,13 +69,24 @@ async function _postOverpass(query, signal) {
         const getUrl = `${url}?${new URLSearchParams({ data: query }).toString()}`;
         const get = await fetch(getUrl, { method: "GET", signal: ctrl.signal });
         if (!get.ok) throw new Error(`overpass GET ${get.status}`);
-        return get.json();
+        data = await get.json();
       }
-    };
 
-    return request().finally(() => clearTimeout(timer));
-  });
-  return Promise.any(attempts);
+      // Do not let a temporarily empty mirror hide real data available from
+      // another mirror. Keep the empty response only as a last resort.
+      if (Array.isArray(data?.elements) && data.elements.length > 0) return data;
+      if (firstSuccessfulEmpty == null) firstSuccessfulEmpty = data;
+    } catch {
+      // Try the next mirror. A 429/5xx/timeout should not make the category
+      // permanently unavailable when another public mirror is healthy.
+    } finally {
+      clearTimeout(timer);
+      signal?.removeEventListener("abort", onAbort);
+    }
+  }
+
+  if (firstSuccessfulEmpty) return firstSuccessfulEmpty;
+  throw new Error("all Overpass endpoints failed");
 }
 
 export function normalizeElements(elements, category, lat, lon, radius = Infinity) {
@@ -112,7 +133,12 @@ export async function queryCategory({ category, lat, lon, radius, signal }) {
 }
 
 export async function queryPOIs({ lat, lon, radius, categories, signal }) {
-  const arr = await Promise.all(categories.map((c) => queryCategory({ category: c, lat, lon, radius, signal })));
+  const arr = [];
+  // Keep category requests serial as well. Parallel category queries were the
+  // main trigger for Overpass rate-limit failures when several layers are on.
+  for (const category of categories) {
+    arr.push(await queryCategory({ category, lat, lon, radius, signal }));
+  }
   const cats = {};
   const counts = {};
   const unavailable = [];
